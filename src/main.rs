@@ -1,6 +1,7 @@
 use clap::{AppSettings, Clap};
 use dirs;
 use git2::Config;
+use open;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::error::Error;
@@ -21,6 +22,7 @@ struct Opts {
 enum SubCommand {
     Mob(Mob),
     Solo(Solo),
+    EditCoauthors(EditCoauthors),
 }
 
 /// Users mobbing with, for example "git mob fb ab"
@@ -35,6 +37,11 @@ struct Mob {
 #[derive(Clap)]
 #[clap(setting = AppSettings::ColoredHelp)]
 struct Solo {}
+
+/// Edit coauthors config file
+#[derive(Clap)]
+#[clap(setting = AppSettings::ColoredHelp)]
+struct EditCoauthors {}
 
 #[derive(Serialize, Deserialize, Debug)]
 struct Coauthors {
@@ -100,11 +107,28 @@ impl GitMob {
         self.0.write(&gitmessage_path, "".to_string());
     }
 
+    /// Returns the coauthors path
+    ///
+    /// This supports both xdg (prioritized) or if the config is in the home directory (like
+    /// git-mob).
     fn get_coauthors_path(&self) -> PathBuf {
-        // TODO support xdg
-        let mut home = dirs::home_dir().unwrap();
-        home.push(".git-coauthors");
-        home
+        let file_name = "git-coauthors";
+
+        // most likely on fresh install after first use
+        let mut coauthors_path = dirs::config_dir().unwrap();
+        coauthors_path.push(file_name);
+        if coauthors_path.exists() {
+            return coauthors_path;
+        }
+
+        // else check home dir - if it doesn't exist (like a fresh install) use xdg instead
+        let mut home_coauthors_path = dirs::home_dir().unwrap();
+        home_coauthors_path.push(format!(".{}", file_name));
+        if home_coauthors_path.exists() {
+            home_coauthors_path
+        } else {
+            coauthors_path
+        }
     }
 
     fn mob(&self, users: Vec<String>) -> Result<(), Box<dyn Error>> {
@@ -172,6 +196,34 @@ impl GitMob {
     fn print_output(&self) {
         println!("{}", self.get_output());
     }
+
+    fn edit(&self) {
+        let coauthors_path = self.get_coauthors_path();
+
+        // write part of the config for convenience
+        if !coauthors_path.exists() {
+            let s = "{\n  \"coauthors\": {\n    \"\": {\n      \"name\": \"\",\n      \"email\": \"\"\n    }\n  }\n}\n";
+            self.0.write(&coauthors_path, s.to_string());
+        }
+
+        println!(
+            "Opening {} in the default text editor...",
+            coauthors_path.display()
+        );
+
+        match open::that(coauthors_path) {
+            Ok(exit_status) => {
+                if !exit_status.success() {
+                    if let Some(code) = exit_status.code() {
+                        println!("Command returned non-zero exit status {}!", code);
+                    } else {
+                        println!("Command returned with unknown exit status!");
+                    }
+                }
+            }
+            Err(why) => println!("Failure to execute command: {}", why),
+        }
+    }
 }
 
 fn main() {
@@ -191,6 +243,10 @@ fn main() {
                     return;
                 }
             },
+            SubCommand::EditCoauthors(..) => {
+                gm.edit();
+                return;
+            }
         },
         None => {}
     }
