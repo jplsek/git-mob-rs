@@ -1,12 +1,13 @@
-use std::collections::HashMap;
-use std::fs;
-use std::fs::File;
-use std::io::prelude::*;
-use std::path::Path;
 use clap::{AppSettings, Clap};
 use dirs;
 use git2::Config;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::error::Error;
+use std::fs;
+use std::fs::File;
+use std::io::prelude::*;
+use std::path::{Path, PathBuf};
 
 /// Quickly populates the .git/.gitmessage template file
 #[derive(Clap)]
@@ -33,12 +34,11 @@ struct Mob {
 /// Reset back to just yourself
 #[derive(Clap)]
 #[clap(setting = AppSettings::ColoredHelp)]
-struct Solo {
-}
+struct Solo {}
 
 #[derive(Serialize, Deserialize, Debug)]
 struct Coauthors {
-    coauthors: HashMap<String, Author>
+    coauthors: HashMap<String, Author>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -100,23 +100,48 @@ impl GitMob {
         self.0.write(&gitmessage_path, "".to_string());
     }
 
-    fn mob(&self, users: Vec<String>) {
+    fn get_coauthors_path(&self) -> PathBuf {
+        // TODO support xdg
         let mut home = dirs::home_dir().unwrap();
         home.push(".git-coauthors");
+        home
+    }
 
-        let coauthors_path = home.as_path();
+    fn mob(&self, users: Vec<String>) -> Result<(), Box<dyn Error>> {
+        let coauthors_path = self.get_coauthors_path();
+        let coauthors_path = coauthors_path.as_path();
         let coauthors_str = self.0.read(coauthors_path);
+
+        if coauthors_str.is_empty() {
+            return Err(Box::from(format!(
+                "Coauthors file {} is empty!",
+                coauthors_path.display()
+            )));
+        }
+
         let coauthors: Coauthors = serde_json::from_str(coauthors_str.as_str()).unwrap();
         let coauthors = coauthors.coauthors;
 
         let mut name_emails: Vec<String> = vec![];
 
         for user in users.iter() {
-            let author = &coauthors[user];
-            name_emails.push(format!("Co-authored-by: {} <{}>", &author.name, &author.email));
+            if coauthors.contains_key(user) {
+                let author = &coauthors[user];
+                name_emails.push(format!(
+                    "Co-authored-by: {} <{}>",
+                    &author.name, &author.email
+                ));
+            } else {
+                return Err(Box::from(format!(
+                    "Author with initials \"{}\" not found!",
+                    user
+                )));
+            }
         }
 
         self.write_gitmessage(name_emails.join("\n"));
+
+        Ok(())
     }
 
     fn get_git_user(&self) -> String {
@@ -155,22 +180,25 @@ fn main() {
     let gm = GitMob::new();
 
     match opts.subcmd {
-        Some(cmd) => {
-            match cmd {
-                SubCommand::Solo(..) => {
-                    gm.solo();
-                }
-                SubCommand::Mob(t) => {
-                    gm.mob(t.users);
-                }
+        Some(cmd) => match cmd {
+            SubCommand::Solo(..) => {
+                gm.solo();
             }
-        }
-        None => { }
+            SubCommand::Mob(t) => match gm.mob(t.users) {
+                Ok(_) => {}
+                Err(why) => {
+                    println!("{}", why);
+                    return;
+                }
+            },
+        },
+        None => {}
     }
 
     gm.print_output();
 }
 
+#[cfg(test)]
 mod test {
     use super::*;
     use std::cell::RefCell;
@@ -219,7 +247,9 @@ mod test {
     fn test_mob() {
         let gm = GitMob(Box::from(MockGitMobFileActions::new()));
 
-        gm.0.write(Path::new(""), r#"
+        gm.0.write(
+            Path::new(""),
+            r#"
         {
           "coauthors": {
             "ab": {
@@ -228,14 +258,19 @@ mod test {
             }
           }
         }
-        "#.to_string());
+        "#
+            .to_string(),
+        );
 
-        gm.mob(vec!["ab".to_string()]);
+        gm.mob(vec!["ab".to_string()]).unwrap();
 
         let author = "Co-authored-by: A B <ab@example.com>";
 
         assert_eq!(format!("\n\n{}", author), gm.get_gitmessage());
-        assert_eq!(format!("{}\n{}", gm.get_git_user(), author), gm.get_output());
+        assert_eq!(
+            format!("{}\n{}", gm.get_git_user(), author),
+            gm.get_output()
+        );
 
         gm.solo();
 
@@ -264,20 +299,59 @@ mod test {
 
         gm.0.write(Path::new(""), json.to_string());
 
-        gm.mob(vec!["ab".to_string()]);
+        gm.mob(vec!["ab".to_string()]).unwrap();
 
         let author = "Co-authored-by: A B <ab@example.com>";
 
         assert_eq!(format!("\n\n{}", author), gm.get_gitmessage());
-        assert_eq!(format!("{}\n{}", gm.get_git_user(), author), gm.get_output());
+        assert_eq!(
+            format!("{}\n{}", gm.get_git_user(), author),
+            gm.get_output()
+        );
 
         gm.0.write(Path::new(""), json.to_string());
 
-        gm.mob(vec!["ab".to_string(), "cd".to_string()]);
+        gm.mob(vec!["ab".to_string(), "cd".to_string()]).unwrap();
 
         let authors = "Co-authored-by: A B <ab@example.com>\nCo-authored-by: C D <cd@example.com>";
 
         assert_eq!(format!("\n\n{}", authors), gm.get_gitmessage());
-        assert_eq!(format!("{}\n{}", gm.get_git_user(), authors), gm.get_output());
+        assert_eq!(
+            format!("{}\n{}", gm.get_git_user(), authors),
+            gm.get_output()
+        );
+    }
+
+    #[test]
+    fn test_mob_empty_authors() {
+        let gm = GitMob(Box::from(MockGitMobFileActions::new()));
+        let r = gm.mob(vec!["ab".to_string()]);
+
+        let expected = format!(
+            "Coauthors file {} is empty!",
+            gm.get_coauthors_path().display()
+        );
+        assert_eq!(expected, r.unwrap_err().to_string());
+    }
+
+    #[test]
+    fn test_mob_no_authors() {
+        let gm = GitMob(Box::from(MockGitMobFileActions::new()));
+
+        gm.0.write(
+            Path::new(""),
+            r#"
+        {
+          "coauthors": {
+          }
+        }
+        "#
+            .to_string(),
+        );
+
+        let r = gm.mob(vec!["ab".to_string()]);
+
+        let expected = "Author with initials \"ab\" not found!".to_string();
+        assert_eq!(expected, r.unwrap_err().to_string());
     }
 }
