@@ -88,8 +88,26 @@ impl GitMob {
 
     pub fn get_git_user(&self) -> String {
         let cfg = Config::open_default().unwrap();
-        let user = cfg.get_string("user.name").unwrap();
-        let email = cfg.get_string("user.email").unwrap();
+
+        // these errors should only really happen in ci
+        let c = "user.name";
+        let user = match cfg.get_string(c) {
+            Err(_) => {
+                println!("Warning: your git config \"{}\" is missing!", c);
+                "".to_string()
+            }
+            Ok(user) => user,
+        };
+
+        let c = "user.email";
+        let email = match cfg.get_string(c) {
+            Err(_) => {
+                println!("Warning: your git config \"{}\" is missing!", c);
+                "".to_string()
+            }
+            Ok(email) => email,
+        };
+
         format!("{} <{}>", user, email)
     }
 
