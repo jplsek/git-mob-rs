@@ -1,6 +1,5 @@
 use clap::{AppSettings, Clap};
 use git_mob_rs::GitMob;
-use open;
 
 /// Edit the coauthors config file
 #[derive(Clap)]

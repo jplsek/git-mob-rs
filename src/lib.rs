@@ -1,4 +1,4 @@
-use dirs;
+use dirs::{config_dir, home_dir};
 use git2::Config;
 use std::fs;
 use std::fs::File;
@@ -10,14 +10,13 @@ pub trait FileActions {
     fn read(&self, path: &Path) -> String;
 }
 
-pub struct GMFileActions();
+pub struct GmFileActions();
 
 // Mostly here for unit testing
-impl FileActions for GMFileActions {
+impl FileActions for GmFileActions {
     fn write(&self, path: &Path, s: String) {
-        match fs::write(path, s.as_bytes()) {
-            Err(why) => panic!("couldn't write to {}: {}", path.display(), why),
-            Ok(_) => {}
+        if let Err(why) = fs::write(path, s.as_bytes()) {
+            panic!("couldn't write to {}: {}", path.display(), why)
         }
     }
 
@@ -39,10 +38,16 @@ pub struct GitMob {
     pub file_actions: Box<dyn FileActions>,
 }
 
+impl Default for GitMob {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl GitMob {
     pub fn new() -> GitMob {
         GitMob {
-            file_actions: Box::from(GMFileActions()),
+            file_actions: Box::from(GmFileActions()),
         }
     }
 
@@ -65,14 +70,14 @@ impl GitMob {
         let file_name = "git-coauthors";
 
         // most likely on fresh install after first use
-        let mut coauthors_path = dirs::config_dir().unwrap();
+        let mut coauthors_path = config_dir().unwrap();
         coauthors_path.push(file_name);
         if coauthors_path.exists() {
             return coauthors_path;
         }
 
         // else check home dir - if it doesn't exist (like a fresh install) use xdg instead
-        let mut home_coauthors_path = dirs::home_dir().unwrap();
+        let mut home_coauthors_path = home_dir().unwrap();
         home_coauthors_path.push(format!(".{}", file_name));
         if home_coauthors_path.exists() {
             home_coauthors_path
@@ -117,6 +122,12 @@ pub mod test_utils {
 
     pub struct MockFileActions {
         s: RefCell<String>,
+    }
+
+    impl Default for test_utils::MockFileActions {
+        fn default() -> Self {
+            Self::new()
+        }
     }
 
     impl MockFileActions {
