@@ -1,5 +1,5 @@
 [package]
-name = "git-mob-rs"
+name = "git_mob_rs"
 version = "0.1.0"
 authors = ["Jeremy Plsek <jeremyplsek@gmail.com>"]
 edition = "2018"

@@ -155,18 +155,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "git-mob-rs"
-version = "0.1.0"
-dependencies = [
- "clap",
- "dirs",
- "git2",
- "open",
- "serde",
- "serde_json",
-]
-
-[[package]]
 name = "git2"
 version = "0.13.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -179,6 +167,18 @@ dependencies = [
  "openssl-probe",
  "openssl-sys",
  "url",
+]
+
+[[package]]
+name = "git_mob_rs"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "dirs",
+ "git2",
+ "open",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
