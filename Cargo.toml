@@ -3,6 +3,14 @@ name = "git_mob_rs"
 version = "0.1.0"
 authors = ["Jeremy Plsek <jeremyplsek@gmail.com>"]
 edition = "2018"
+description = "A CLI tool for social coding."
+license = "MIT"
+homepage = "https://github.com/jplsek/git-mob-rs"
+repository = "https://github.com/jplsek/git-mob-rs"
+readme = "README.md"
+exclude = [
+    "benchmark.sh"
+]
 
 [dependencies]
 dirs = "1.0.5"
