@@ -33,12 +33,12 @@ struct Mob {
     users: Vec<String>,
 }
 
-/// Reset back to just yourself
+/// Reset back to just yourself (clears the gitmessage template)
 #[derive(Clap)]
 #[clap(setting = AppSettings::ColoredHelp)]
 struct Solo {}
 
-/// Edit coauthors config file
+/// Edit the coauthors config file
 #[derive(Clap)]
 #[clap(setting = AppSettings::ColoredHelp)]
 struct EditCoauthors {}
@@ -132,6 +132,11 @@ impl GitMob {
     }
 
     fn mob(&self, users: Vec<String>) -> Result<(), Box<dyn Error>> {
+        // make sure to not accidentally "solo"
+        if users.is_empty() {
+            return Ok(())
+        }
+
         let coauthors_path = self.get_coauthors_path();
         let coauthors_path = coauthors_path.as_path();
         let coauthors_str = self.0.read(coauthors_path);
@@ -157,8 +162,9 @@ impl GitMob {
                 ));
             } else {
                 return Err(Box::from(format!(
-                    "Author with initials \"{}\" not found!",
-                    user
+                    "Author with initials \"{}\" not found in {}!",
+                    user,
+                    coauthors_path.display()
                 )));
             }
         }
@@ -328,6 +334,16 @@ mod test {
             gm.get_output()
         );
 
+        // make sure empty vec doesn't reset gitmessage file
+        gm.mob(vec![]).unwrap();
+
+        assert_eq!(format!("\n\n{}", author), gm.get_gitmessage());
+        assert_eq!(
+            format!("{}\n{}", gm.get_git_user(), author),
+            gm.get_output()
+        );
+
+        // make sure solo resets properly
         gm.solo();
 
         assert_eq!("", gm.get_gitmessage());
@@ -407,7 +423,10 @@ mod test {
 
         let r = gm.mob(vec!["ab".to_string()]);
 
-        let expected = "Author with initials \"ab\" not found!".to_string();
+        let expected = format!(
+            "Author with initials \"ab\" not found in {}!",
+            gm.get_coauthors_path().display()
+        );
         assert_eq!(expected, r.unwrap_err().to_string());
     }
 }
