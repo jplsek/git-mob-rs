@@ -1,4 +1,3 @@
-use clap::{AppSettings, Clap};
 use dirs;
 use git2::Config;
 use open;
@@ -9,39 +8,6 @@ use std::fs;
 use std::fs::File;
 use std::io::prelude::*;
 use std::path::{Path, PathBuf};
-
-/// Quickly populates the .git/.gitmessage template file
-#[derive(Clap)]
-#[clap(setting = AppSettings::ColoredHelp)]
-struct Opts {
-    #[clap(subcommand)]
-    subcmd: Option<SubCommand>,
-}
-
-#[derive(Clap)]
-enum SubCommand {
-    Mob(Mob),
-    Solo(Solo),
-    EditCoauthors(EditCoauthors),
-}
-
-/// Users mobbing with, for example "git mob fb ab"
-#[derive(Clap)]
-#[clap(setting = AppSettings::ColoredHelp)]
-struct Mob {
-    /// Users mobbing with, for example "git mob fb ab"
-    users: Vec<String>,
-}
-
-/// Reset back to just yourself (clears the gitmessage template)
-#[derive(Clap)]
-#[clap(setting = AppSettings::ColoredHelp)]
-struct Solo {}
-
-/// Edit the coauthors config file
-#[derive(Clap)]
-#[clap(setting = AppSettings::ColoredHelp)]
-struct EditCoauthors {}
 
 #[derive(Serialize, Deserialize, Debug)]
 struct Coauthors {
@@ -84,10 +50,10 @@ impl FileActions for GitMobFileActions {
     }
 }
 
-struct GitMob(Box<dyn FileActions>);
+pub struct GitMob(Box<dyn FileActions>);
 
 impl GitMob {
-    fn new() -> GitMob {
+    pub fn new() -> GitMob {
         GitMob(Box::from(GitMobFileActions()))
     }
 
@@ -101,7 +67,7 @@ impl GitMob {
         self.0.write(&gitmessage_path, format!("\n\n{}", s));
     }
 
-    fn solo(&self) {
+    pub fn solo(&self) {
         let gitmessage_path = self.get_gitmessage_path();
 
         self.0.write(&gitmessage_path, "".to_string());
@@ -131,10 +97,10 @@ impl GitMob {
         }
     }
 
-    fn mob(&self, users: Vec<String>) -> Result<(), Box<dyn Error>> {
+    pub fn mob(&self, users: Vec<String>) -> Result<(), Box<dyn Error>> {
         // make sure to not accidentally "solo"
         if users.is_empty() {
-            return Ok(())
+            return Ok(());
         }
 
         let coauthors_path = self.get_coauthors_path();
@@ -199,11 +165,11 @@ impl GitMob {
         }
     }
 
-    fn print_output(&self) {
+    pub fn print_output(&self) {
         println!("{}", self.get_output());
     }
 
-    fn edit(&self) {
+    pub fn edit(&self) {
         let coauthors_path = self.get_coauthors_path();
 
         // write part of the config for convenience
@@ -230,34 +196,6 @@ impl GitMob {
             Err(why) => println!("Failure to execute command: {}", why),
         }
     }
-}
-
-fn main() {
-    let opts: Opts = Opts::parse();
-
-    let gm = GitMob::new();
-
-    match opts.subcmd {
-        Some(cmd) => match cmd {
-            SubCommand::Solo(..) => {
-                gm.solo();
-            }
-            SubCommand::Mob(t) => match gm.mob(t.users) {
-                Ok(_) => {}
-                Err(why) => {
-                    println!("{}", why);
-                    return;
-                }
-            },
-            SubCommand::EditCoauthors(..) => {
-                gm.edit();
-                return;
-            }
-        },
-        None => {}
-    }
-
-    gm.print_output();
 }
 
 #[cfg(test)]
