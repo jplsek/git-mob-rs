@@ -1,34 +1,19 @@
 use dirs;
 use git2::Config;
-use open;
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::error::Error;
 use std::fs;
 use std::fs::File;
 use std::io::prelude::*;
 use std::path::{Path, PathBuf};
 
-#[derive(Serialize, Deserialize, Debug)]
-struct Coauthors {
-    coauthors: HashMap<String, Author>,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-struct Author {
-    name: String,
-    email: String,
-}
-
-trait FileActions {
+pub trait FileActions {
     fn write(&self, path: &Path, s: String);
     fn read(&self, path: &Path) -> String;
 }
 
-struct GitMobFileActions();
+pub struct GMFileActions();
 
 // Mostly here for unit testing
-impl FileActions for GitMobFileActions {
+impl FileActions for GMFileActions {
     fn write(&self, path: &Path, s: String) {
         match fs::write(path, s.as_bytes()) {
             Err(why) => panic!("couldn't write to {}: {}", path.display(), why),
@@ -50,34 +35,33 @@ impl FileActions for GitMobFileActions {
     }
 }
 
-pub struct GitMob(Box<dyn FileActions>);
+pub struct GitMob {
+    pub file_actions: Box<dyn FileActions>,
+}
 
 impl GitMob {
     pub fn new() -> GitMob {
-        GitMob(Box::from(GitMobFileActions()))
+        GitMob {
+            file_actions: Box::from(GMFileActions()),
+        }
     }
 
-    fn get_gitmessage_path<'a>(&self) -> &'a Path {
+    pub fn get_gitmessage_path<'a>(&self) -> &'a Path {
         Path::new(".git/.gitmessage")
     }
 
-    fn write_gitmessage(&self, s: String) {
+    pub fn write_gitmessage(&self, s: String) {
         let gitmessage_path = self.get_gitmessage_path();
 
-        self.0.write(&gitmessage_path, format!("\n\n{}", s));
-    }
-
-    pub fn solo(&self) {
-        let gitmessage_path = self.get_gitmessage_path();
-
-        self.0.write(&gitmessage_path, "".to_string());
+        self.file_actions
+            .write(&gitmessage_path, format!("\n\n{}", s));
     }
 
     /// Returns the coauthors path
     ///
     /// This supports both xdg (prioritized) or if the config is in the home directory (like
     /// git-mob).
-    fn get_coauthors_path(&self) -> PathBuf {
+    pub fn get_coauthors_path(&self) -> PathBuf {
         let file_name = "git-coauthors";
 
         // most likely on fresh install after first use
@@ -97,62 +81,19 @@ impl GitMob {
         }
     }
 
-    pub fn mob(&self, users: Vec<String>) -> Result<(), Box<dyn Error>> {
-        // make sure to not accidentally "solo"
-        if users.is_empty() {
-            return Ok(());
-        }
-
-        let coauthors_path = self.get_coauthors_path();
-        let coauthors_path = coauthors_path.as_path();
-        let coauthors_str = self.0.read(coauthors_path);
-
-        if coauthors_str.is_empty() {
-            return Err(Box::from(format!(
-                "Coauthors file {} is empty!",
-                coauthors_path.display()
-            )));
-        }
-
-        let coauthors: Coauthors = serde_json::from_str(coauthors_str.as_str()).unwrap();
-        let coauthors = coauthors.coauthors;
-
-        let mut name_emails: Vec<String> = vec![];
-
-        for user in users.iter() {
-            if coauthors.contains_key(user) {
-                let author = &coauthors[user];
-                name_emails.push(format!(
-                    "Co-authored-by: {} <{}>",
-                    &author.name, &author.email
-                ));
-            } else {
-                return Err(Box::from(format!(
-                    "Author with initials \"{}\" not found in {}!",
-                    user,
-                    coauthors_path.display()
-                )));
-            }
-        }
-
-        self.write_gitmessage(name_emails.join("\n"));
-
-        Ok(())
-    }
-
-    fn get_git_user(&self) -> String {
+    pub fn get_git_user(&self) -> String {
         let cfg = Config::open_default().unwrap();
         let user = cfg.get_string("user.name").unwrap();
         let email = cfg.get_string("user.email").unwrap();
         format!("{} <{}>", user, email)
     }
 
-    fn get_gitmessage(&self) -> String {
+    pub fn get_gitmessage(&self) -> String {
         let gitmessage_path = self.get_gitmessage_path();
-        self.0.read(&gitmessage_path)
+        self.file_actions.read(&gitmessage_path)
     }
 
-    fn get_output(&self) -> String {
+    pub fn get_output(&self) -> String {
         let git_user = self.get_git_user();
 
         let gitmessage = self.get_gitmessage();
@@ -168,54 +109,25 @@ impl GitMob {
     pub fn print_output(&self) {
         println!("{}", self.get_output());
     }
-
-    pub fn edit(&self) {
-        let coauthors_path = self.get_coauthors_path();
-
-        // write part of the config for convenience
-        if !coauthors_path.exists() {
-            let s = "{\n  \"coauthors\": {\n    \"\": {\n      \"name\": \"\",\n      \"email\": \"\"\n    }\n  }\n}\n";
-            self.0.write(&coauthors_path, s.to_string());
-        }
-
-        println!(
-            "Opening {} in the default text editor...",
-            coauthors_path.display()
-        );
-
-        match open::that(coauthors_path) {
-            Ok(exit_status) => {
-                if !exit_status.success() {
-                    if let Some(code) = exit_status.code() {
-                        println!("Command returned non-zero exit status {}!", code);
-                    } else {
-                        println!("Command returned with unknown exit status!");
-                    }
-                }
-            }
-            Err(why) => println!("Failure to execute command: {}", why),
-        }
-    }
 }
 
-#[cfg(test)]
-mod test {
+pub mod test_utils {
     use super::*;
     use std::cell::RefCell;
 
-    struct MockGitMobFileActions {
+    pub struct MockFileActions {
         s: RefCell<String>,
     }
 
-    impl MockGitMobFileActions {
-        fn new() -> MockGitMobFileActions {
-            MockGitMobFileActions {
+    impl MockFileActions {
+        pub fn new() -> MockFileActions {
+            MockFileActions {
                 s: RefCell::new(String::new()),
             }
         }
     }
 
-    impl FileActions for MockGitMobFileActions {
+    impl FileActions for MockFileActions {
         fn write(&self, _: &Path, s: String) {
             self.s.replace(s);
         }
@@ -225,146 +137,24 @@ mod test {
         }
     }
 
+    pub fn get_git_mob() -> GitMob {
+        GitMob {
+            file_actions: Box::from(MockFileActions::new()),
+        }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use test_utils::get_git_mob;
+
     #[test]
     fn test_write_gitmessage() {
-        let gm = GitMob(Box::from(MockGitMobFileActions::new()));
+        let gm = get_git_mob();
         gm.write_gitmessage("test".to_string());
 
         assert_eq!("\n\ntest", gm.get_gitmessage());
         assert_eq!(format!("{}\ntest", gm.get_git_user()), gm.get_output());
-    }
-
-    #[test]
-    fn test_solo() {
-        let gm = GitMob(Box::from(MockGitMobFileActions::new()));
-        gm.solo();
-
-        assert_eq!("", gm.get_gitmessage());
-        assert_eq!(gm.get_git_user(), gm.get_output());
-    }
-
-    #[test]
-    fn test_mob() {
-        let gm = GitMob(Box::from(MockGitMobFileActions::new()));
-
-        gm.0.write(
-            Path::new(""),
-            r#"
-        {
-          "coauthors": {
-            "ab": {
-                "name": "A B",
-                "email": "ab@example.com"
-            }
-          }
-        }
-        "#
-            .to_string(),
-        );
-
-        gm.mob(vec!["ab".to_string()]).unwrap();
-
-        let author = "Co-authored-by: A B <ab@example.com>";
-
-        assert_eq!(format!("\n\n{}", author), gm.get_gitmessage());
-        assert_eq!(
-            format!("{}\n{}", gm.get_git_user(), author),
-            gm.get_output()
-        );
-
-        // make sure empty vec doesn't reset gitmessage file
-        gm.mob(vec![]).unwrap();
-
-        assert_eq!(format!("\n\n{}", author), gm.get_gitmessage());
-        assert_eq!(
-            format!("{}\n{}", gm.get_git_user(), author),
-            gm.get_output()
-        );
-
-        // make sure solo resets properly
-        gm.solo();
-
-        assert_eq!("", gm.get_gitmessage());
-        assert_eq!(gm.get_git_user(), gm.get_output());
-    }
-
-    #[test]
-    fn test_mob_2() {
-        let gm = GitMob(Box::from(MockGitMobFileActions::new()));
-
-        let json = r#"
-        {
-          "coauthors": {
-            "ab": {
-                "name": "A B",
-                "email": "ab@example.com"
-            },
-            "cd": {
-                "name": "C D",
-                "email": "cd@example.com"
-            }
-          }
-        }
-        "#;
-
-        gm.0.write(Path::new(""), json.to_string());
-
-        gm.mob(vec!["ab".to_string()]).unwrap();
-
-        let author = "Co-authored-by: A B <ab@example.com>";
-
-        assert_eq!(format!("\n\n{}", author), gm.get_gitmessage());
-        assert_eq!(
-            format!("{}\n{}", gm.get_git_user(), author),
-            gm.get_output()
-        );
-
-        gm.0.write(Path::new(""), json.to_string());
-
-        gm.mob(vec!["ab".to_string(), "cd".to_string()]).unwrap();
-
-        let authors = "Co-authored-by: A B <ab@example.com>\nCo-authored-by: C D <cd@example.com>";
-
-        assert_eq!(format!("\n\n{}", authors), gm.get_gitmessage());
-        assert_eq!(
-            format!("{}\n{}", gm.get_git_user(), authors),
-            gm.get_output()
-        );
-    }
-
-    #[test]
-    fn test_mob_empty_authors() {
-        let gm = GitMob(Box::from(MockGitMobFileActions::new()));
-        let r = gm.mob(vec!["ab".to_string()]);
-
-        let expected = format!(
-            "Coauthors file {} is empty!",
-            gm.get_coauthors_path().display()
-        );
-        assert_eq!(expected, r.unwrap_err().to_string());
-    }
-
-    #[test]
-    fn test_mob_no_authors() {
-        let gm = GitMob(Box::from(MockGitMobFileActions::new()));
-
-        gm.0.write(
-            Path::new(""),
-            r#"
-        {
-          "coauthors": {
-          }
-        }
-        "#
-            .to_string(),
-        );
-
-        let r = gm.mob(vec!["ab".to_string()]);
-
-        let expected = format!(
-            "Author with initials \"ab\" not found in {}!",
-            gm.get_coauthors_path().display()
-        );
-        assert_eq!(expected, r.unwrap_err().to_string());
     }
 }
