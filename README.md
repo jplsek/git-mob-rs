@@ -58,27 +58,29 @@ $ git solo
 
 ### Mac
 
-TODO
+```
+brew install jplsek/tap/git-mob-rs
+```
 
 ### Linux
 
-TODO
+See the [release page](https://github.com/jplsek/git-mob-rs/releases) for binaries or build from source.
 
 ### Windows
 
-TODO
+There is no installer, but there are executables that you can put somewhere. See the [release page](https://github.com/jplsek/git-mob-rs/releases) or build from source.
 
-### From cargo
+### Cargo
 
 ```
 cargo install git_mob_rs
 ```
 
-### From source
+### Source
 
 ```
 git clone https://github.com/jplsek/git-mob-rs && cd git-mob-rs
-cargo install
+cargo install --path .
 ```
 
 ## Differences
