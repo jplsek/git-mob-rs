@@ -1,5 +1,5 @@
 use dirs::{config_dir, home_dir};
-use git2::Config;
+use git2::Repository;
 use std::fs;
 use std::fs::File;
 use std::io::prelude::*;
@@ -51,8 +51,14 @@ impl GitMob {
         }
     }
 
-    pub fn get_gitmessage_path<'a>(&self) -> &'a Path {
-        Path::new(".git/.gitmessage")
+    pub fn get_repo(&self) -> Repository {
+        Repository::open_from_env().unwrap_or_else(|_| {
+            panic!("Not in a git repository");
+        })
+    }
+
+    pub fn get_gitmessage_path(&self) -> PathBuf {
+        self.get_repo().path().join(".gitmessage")
     }
 
     pub fn write_gitmessage(&self, s: String) {
@@ -87,7 +93,7 @@ impl GitMob {
     }
 
     pub fn get_git_user(&self) -> String {
-        let cfg = Config::open_default().unwrap();
+        let cfg = self.get_repo().config().unwrap();
 
         // these errors should only really happen in ci
         let c = "user.name";
