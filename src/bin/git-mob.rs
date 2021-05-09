@@ -2,9 +2,8 @@ use clap::{AppSettings, Clap};
 use git_mob_rs::GitMob;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::error::Error;
 
-/// Quickly populates the .git/.gitmessage template file
+/// Quickly populates the .git/gitmessage template file
 #[derive(Clap)]
 #[clap(setting = AppSettings::ColoredHelp)]
 struct Opts {
@@ -24,25 +23,22 @@ struct Author {
 }
 
 trait Mob {
-    fn mob(&self, users: Vec<String>) -> Result<(), Box<dyn Error>>;
+    fn mob(&self, users: Vec<String>);
 }
 
 impl Mob for GitMob {
-    fn mob(&self, users: Vec<String>) -> Result<(), Box<dyn Error>> {
+    fn mob(&self, users: Vec<String>) {
         // make sure to not accidentally "solo"
         if users.is_empty() {
-            return Ok(());
+            return;
         }
 
         let coauthors_path = self.get_coauthors_path();
         let coauthors_path = coauthors_path.as_path();
-        let coauthors_str = self.file_actions.read(coauthors_path);
+        let coauthors_str = self.file_actions.read(coauthors_path).unwrap();
 
         if coauthors_str.is_empty() {
-            return Err(Box::from(format!(
-                "Coauthors file {} is empty!",
-                coauthors_path.display()
-            )));
+            panic!("Coauthors file {} is empty!", coauthors_path.display());
         }
 
         let coauthors: Coauthors = serde_json::from_str(coauthors_str.as_str()).unwrap();
@@ -58,32 +54,24 @@ impl Mob for GitMob {
                     &author.name, &author.email
                 ));
             } else {
-                return Err(Box::from(format!(
+                panic!(
                     "Author with initials \"{}\" not found in {}!",
                     user,
                     coauthors_path.display()
-                )));
+                );
             }
         }
 
         self.write_gitmessage(name_emails.join("\n"));
-
-        Ok(())
     }
 }
 
 fn main() {
     let opts: Opts = Opts::parse();
 
-    let gm = GitMob::new();
+    let gm = GitMob::default();
 
-    match gm.mob(opts.users) {
-        Ok(_) => {}
-        Err(why) => {
-            println!("{}", why);
-            return;
-        }
-    }
+    gm.mob(opts.users);
 
     gm.print_output();
 }
@@ -98,11 +86,14 @@ mod test {
     fn test_mob() {
         let gm = get_git_mob();
         let gitmessage_path = gm.get_gitmessage_path();
-        gm.file_actions.write(&gitmessage_path, "".to_string());
+        gm.file_actions
+            .write(&gitmessage_path, "".to_string())
+            .unwrap();
 
-        gm.file_actions.write(
-            Path::new(""),
-            r#"
+        gm.file_actions
+            .write(
+                Path::new(""),
+                r#"
         {
           "coauthors": {
             "ab": {
@@ -112,10 +103,11 @@ mod test {
           }
         }
         "#
-            .to_string(),
-        );
+                .to_string(),
+            )
+            .unwrap();
 
-        gm.mob(vec!["ab".to_string()]).unwrap();
+        gm.mob(vec!["ab".to_string()]);
 
         let author = "Co-authored-by: A B <ab@example.com>";
 
@@ -126,7 +118,7 @@ mod test {
         );
 
         // make sure empty vec doesn't reset gitmessage file
-        gm.mob(vec![]).unwrap();
+        gm.mob(vec![]);
 
         assert_eq!(format!("\n\n{}", author), gm.get_gitmessage());
         assert_eq!(
@@ -154,9 +146,11 @@ mod test {
         }
         "#;
 
-        gm.file_actions.write(Path::new(""), json.to_string());
+        gm.file_actions
+            .write(Path::new(""), json.to_string())
+            .unwrap();
 
-        gm.mob(vec!["ab".to_string()]).unwrap();
+        gm.mob(vec!["ab".to_string()]);
 
         let author = "Co-authored-by: A B <ab@example.com>";
 
@@ -166,9 +160,11 @@ mod test {
             gm.get_output()
         );
 
-        gm.file_actions.write(Path::new(""), json.to_string());
+        gm.file_actions
+            .write(Path::new(""), json.to_string())
+            .unwrap();
 
-        gm.mob(vec!["ab".to_string(), "cd".to_string()]).unwrap();
+        gm.mob(vec!["ab".to_string(), "cd".to_string()]);
 
         let authors = "Co-authored-by: A B <ab@example.com>\nCo-authored-by: C D <cd@example.com>";
 
@@ -180,38 +176,30 @@ mod test {
     }
 
     #[test]
+    #[should_panic]
     fn test_mob_empty_authors() {
         let gm = get_git_mob();
-        let r = gm.mob(vec!["ab".to_string()]);
-
-        let expected = format!(
-            "Coauthors file {} is empty!",
-            gm.get_coauthors_path().display()
-        );
-        assert_eq!(expected, r.unwrap_err().to_string());
+        gm.mob(vec!["ab".to_string()]);
     }
 
     #[test]
+    #[should_panic]
     fn test_mob_no_authors() {
         let gm = get_git_mob();
 
-        gm.file_actions.write(
-            Path::new(""),
-            r#"
+        gm.file_actions
+            .write(
+                Path::new(""),
+                r#"
         {
           "coauthors": {
           }
         }
         "#
-            .to_string(),
-        );
+                .to_string(),
+            )
+            .unwrap();
 
-        let r = gm.mob(vec!["ab".to_string()]);
-
-        let expected = format!(
-            "Author with initials \"ab\" not found in {}!",
-            gm.get_coauthors_path().display()
-        );
-        assert_eq!(expected, r.unwrap_err().to_string());
+        gm.mob(vec!["ab".to_string()]);
     }
 }

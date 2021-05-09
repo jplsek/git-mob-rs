@@ -17,7 +17,9 @@ impl Edit for GitMob {
         // write part of the config for convenience
         if !coauthors_path.exists() {
             let s = "{\n  \"coauthors\": {\n    \"\": {\n      \"name\": \"\",\n      \"email\": \"\"\n    }\n  }\n}\n";
-            self.file_actions.write(&coauthors_path, s.to_string());
+            self.file_actions
+                .write(&coauthors_path, s.to_string())
+                .unwrap();
         }
 
         println!(
@@ -29,13 +31,13 @@ impl Edit for GitMob {
             Ok(exit_status) => {
                 if !exit_status.success() {
                     if let Some(code) = exit_status.code() {
-                        println!("Command returned non-zero exit status {}!", code);
+                        panic!("Command returned non-zero exit status {}!", code);
                     } else {
-                        println!("Command returned with unknown exit status!");
+                        panic!("Command returned with unknown exit status!");
                     }
                 }
             }
-            Err(why) => println!("Failure to execute command: {}", why),
+            Err(why) => panic!("Failure to execute command: {}", why),
         }
     }
 }
@@ -43,7 +45,7 @@ impl Edit for GitMob {
 fn main() {
     Opts::parse();
 
-    let gm = GitMob::new();
+    let gm = GitMob::default();
 
     gm.edit();
 }

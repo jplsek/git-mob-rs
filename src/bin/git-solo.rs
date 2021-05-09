@@ -12,16 +12,14 @@ trait Solo {
 
 impl Solo for GitMob {
     fn solo(&self) {
-        let gitmessage_path = self.get_gitmessage_path();
-
-        self.file_actions.write(&gitmessage_path, "".to_string());
+        self.write_gitmessage(String::from(""));
     }
 }
 
 fn main() {
     Opts::parse();
 
-    let gm = GitMob::new();
+    let gm = GitMob::default();
 
     gm.solo();
 

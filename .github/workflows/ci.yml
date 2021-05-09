@@ -41,7 +41,8 @@ jobs:
           args: -- -D warnings
 
   artifact:
-    needs: [tests]
+    needs: tests
+    if: github.ref == 'refs/heads/main'
     name: Create artifact
     strategy:
       matrix:

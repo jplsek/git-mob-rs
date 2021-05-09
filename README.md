@@ -5,7 +5,7 @@ git_mob_rs is a rust version of [Git Mob](https://github.com/findmypast-oss/git-
 Please see their readme and blog for more information on why this type of tool exists.
 
 This Rust version was made because I felt like learning some Rust and applying it to a tool I use everyday at work.
-Since I use this everyday at work, one thing I did not like about git-mob was it's speed.
+Since I use this everyday at work, one thing I did not like about git-mob was its speed.
 IMO, it shouldn't take ~50-120ms to set a template, so I wanted it to be faster by using a native implementation.
 
 This version is not a one to one implementation. See the [differences](#differences) for more details.
