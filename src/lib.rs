@@ -1,5 +1,5 @@
 use dirs::{config_dir, home_dir};
-use git2::{Config, Repository};
+use git2::{Config, ErrorCode, Repository};
 use std::error::Error;
 use std::fs;
 use std::fs::File;
@@ -90,7 +90,26 @@ impl GitMob {
                     "{}\nMake sure you are in a git repository when running this command",
                     error
                 )
-            })
+            });
+
+        self.set_git_template();
+    }
+
+    fn set_git_template(&self) {
+        let mut cfg = self.get_repo().config().unwrap();
+        let key = "commit.template";
+
+        // don't write to if we don't have to
+        match cfg.get_entry(key) {
+            Ok(_) => return,
+            Err(err) => {
+                if err.code() != ErrorCode::NotFound {
+                    panic!("{}", err);
+                }
+            }
+        };
+
+        cfg.set_str(key, ".git/.gitmessage").unwrap();
     }
 
     /// Returns the coauthors path
