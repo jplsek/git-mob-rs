@@ -68,7 +68,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v2
         with:
-          name: artifact-${{ matrix.os }}
+          name: git-mob-rs-${{ matrix.os }}
           path: |
             target/release/git-*
             !target/release/git-*.d
