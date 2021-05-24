@@ -1,5 +1,5 @@
 use dirs::{config_dir, home_dir};
-use git2::Repository;
+use git2::{Config, Repository};
 use std::error::Error;
 use std::fs;
 use std::fs::File;
@@ -117,21 +117,19 @@ impl GitMob {
         }
     }
 
+    fn get_git_config(&self, cfg: &Config, key: &str) -> String {
+        // these errors should only really happen in ci
+        cfg.get_string(key).unwrap_or_else(|_| {
+            println!("Warning: your git config \"{}\" is missing!", key);
+            "".to_string()
+        })
+    }
+
     pub fn get_git_user(&self) -> String {
         let cfg = self.get_repo().config().unwrap();
 
-        // these errors should only really happen in ci
-        let c = "user.name";
-        let user = cfg.get_string(c).unwrap_or_else(|_| {
-            println!("Warning: your git config \"{}\" is missing!", c);
-            "".to_string()
-        });
-
-        let c = "user.email";
-        let email = cfg.get_string(c).unwrap_or_else(|_| {
-            println!("Warning: your git config \"{}\" is missing!", c);
-            "".to_string()
-        });
+        let user = self.get_git_config(&cfg, "user.name");
+        let email = self.get_git_config(&cfg, "user.email");
 
         format!("{} <{}>", user, email)
     }
