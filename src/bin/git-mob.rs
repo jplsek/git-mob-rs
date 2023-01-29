@@ -1,185 +1,154 @@
-use clap::{AppSettings, Clap};
+use clap::Parser;
 use git_mob_rs::GitMob;
-use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 /// Quickly populates the .git/gitmessage template file
-#[derive(Clap)]
-#[clap(setting = AppSettings::ColoredHelp)]
-struct Opts {
-    /// Users mobbing with, for example "git mob fb ab"
-    users: Vec<String>,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-struct Coauthors {
-    coauthors: HashMap<String, Author>,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-struct Author {
-    name: String,
-    email: String,
+#[derive(Parser)]
+#[command(version, long_about = None)]
+struct Cli {
+    /// Who to set as the coauthor, for example "git mob fb ab"
+    initials: Vec<String>,
+    /// Show a list of all co-authors
+    #[arg(short, long)]
+    list: bool,
 }
 
 trait Mob {
-    fn mob(&self, users: Vec<String>);
+    fn mob(&self, users: Vec<String>) -> String;
+    fn list(&self) -> String;
 }
 
 impl Mob for GitMob {
-    fn mob(&self, users: Vec<String>) {
+    fn list(&self) -> String {
+        let coauthors = self.get_all_coauthors();
+        let mut s = String::new();
+        for (initials, author) in coauthors {
+            let name = author.name;
+            let email = author.email;
+            s.push_str(format!("{initials} {name} <{email}>\n").as_str());
+        }
+        s
+    }
+
+    fn mob(&self, initials: Vec<String>) -> String {
         // make sure to not accidentally "solo"
-        if users.is_empty() {
-            return;
+        if initials.is_empty() {
+            return self.get_formatted_gitmessage();
         }
 
-        let coauthors_path = self.get_coauthors_path();
-        let coauthors_path = coauthors_path.as_path();
-        let coauthors_str = self.file_actions.read(coauthors_path).unwrap();
-
-        if coauthors_str.is_empty() {
-            panic!("Coauthors file {} is empty!", coauthors_path.display());
-        }
-
-        let coauthors: Coauthors = serde_json::from_str(coauthors_str.as_str()).unwrap();
-        let coauthors = coauthors.coauthors;
+        let coauthors = self.get_all_coauthors();
 
         let mut name_emails: Vec<String> = vec![];
 
-        for user in users.iter() {
-            if coauthors.contains_key(user) {
-                let author = &coauthors[user];
-                name_emails.push(format!(
-                    "Co-authored-by: {} <{}>",
-                    &author.name, &author.email
-                ));
+        for initial in initials.iter() {
+            if coauthors.contains_key(initial) {
+                let author = &coauthors[initial];
+                let name = &author.name;
+                let email = &author.email;
+                name_emails.push(format!("Co-authored-by: {name} <{email}>"));
             } else {
+                let coauthors_path = self.get_coauthors_path();
+                let coauthors_path = coauthors_path.as_path();
                 panic!(
                     "Author with initials \"{}\" not found in {}!",
-                    user,
+                    initial,
                     coauthors_path.display()
                 );
             }
         }
 
         self.write_gitmessage(name_emails.join("\n"));
+        self.get_formatted_gitmessage()
     }
 }
 
 fn main() {
-    let opts: Opts = Opts::parse();
+    let opts: Cli = Cli::parse();
 
     let gm = GitMob::default();
 
-    gm.mob(opts.users);
-
-    gm.print_output();
+    if opts.list {
+        print!("{}", gm.list());
+    } else {
+        println!("{}", gm.mob(opts.initials));
+    }
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
     use git_mob_rs::test_utils::get_git_mob;
+    use serde_json::json;
     use std::path::Path;
 
     #[test]
     fn test_mob() {
         let gm = get_git_mob();
-        let gitmessage_path = gm.get_gitmessage_path();
-        gm.file_actions
-            .write(&gitmessage_path, "".to_string())
-            .unwrap();
 
-        gm.file_actions
-            .write(
-                Path::new(""),
-                r#"
-        {
-          "coauthors": {
-            "ab": {
-                "name": "A B",
-                "email": "ab@example.com"
+        let json = json!({
+            "coauthors": {
+                "ab": {
+                    "name": "A B",
+                    "email": "ab@example.com"
+                },
+                "cd": {
+                    "name": "C D",
+                    "email": "cd@example.com"
+                }
             }
-          }
-        }
-        "#
-                .to_string(),
-            )
-            .unwrap();
-
-        gm.mob(vec!["ab".to_string()]);
-
-        let author = "Co-authored-by: A B <ab@example.com>";
-
-        assert_eq!(format!("\n\n{}", author), gm.get_gitmessage());
-        assert_eq!(
-            format!("{}\n{}", gm.get_git_user(), author),
-            gm.get_output()
-        );
-
-        // make sure empty vec doesn't reset gitmessage file
-        gm.mob(vec![]);
-
-        assert_eq!(format!("\n\n{}", author), gm.get_gitmessage());
-        assert_eq!(
-            format!("{}\n{}", gm.get_git_user(), author),
-            gm.get_output()
-        );
-    }
-
-    #[test]
-    fn test_mob_2() {
-        let gm = get_git_mob();
-
-        let json = r#"
-        {
-          "coauthors": {
-            "ab": {
-                "name": "A B",
-                "email": "ab@example.com"
-            },
-            "cd": {
-                "name": "C D",
-                "email": "cd@example.com"
-            }
-          }
-        }
-        "#;
+        });
 
         gm.file_actions
             .write(Path::new(""), json.to_string())
             .unwrap();
-
-        gm.mob(vec!["ab".to_string()]);
-
-        let author = "Co-authored-by: A B <ab@example.com>";
-
-        assert_eq!(format!("\n\n{}", author), gm.get_gitmessage());
-        assert_eq!(
-            format!("{}\n{}", gm.get_git_user(), author),
-            gm.get_output()
-        );
-
-        gm.file_actions
-            .write(Path::new(""), json.to_string())
-            .unwrap();
-
-        gm.mob(vec!["ab".to_string(), "cd".to_string()]);
 
         let authors = "Co-authored-by: A B <ab@example.com>\nCo-authored-by: C D <cd@example.com>";
 
-        assert_eq!(format!("\n\n{}", authors), gm.get_gitmessage());
         assert_eq!(
             format!("{}\n{}", gm.get_git_user(), authors),
-            gm.get_output()
+            gm.mob(vec![String::from("ab"), String::from("cd")])
         );
+        assert_eq!(format!("\n\n{}", authors), gm.get_gitmessage());
+
+        // make sure empty vec doesn't reset gitmessage file
+        assert_eq!(
+            format!("{}\n{}", gm.get_git_user(), authors),
+            gm.mob(vec![])
+        );
+        assert_eq!(format!("\n\n{}", authors), gm.get_gitmessage());
+    }
+
+    #[test]
+    fn test_list() {
+        let gm = get_git_mob();
+
+        let coauthors = json!({
+            "coauthors": {
+                "ab": {
+                    "name": "A B",
+                    "email": "ab@example.com"
+                },
+                "cd": {
+                    "name": "C D",
+                    "email": "cd@example.com"
+                }
+            }
+        });
+
+        gm.file_actions
+            .write(Path::new(""), coauthors.to_string())
+            .unwrap();
+
+        let author1 = "ab A B <ab@example.com>";
+        let author2 = "cd C D <cd@example.com>";
+
+        assert_eq!(format!("{}\n{}\n", author1, author2), gm.list());
     }
 
     #[test]
     #[should_panic]
     fn test_mob_empty_authors() {
         let gm = get_git_mob();
-        gm.mob(vec!["ab".to_string()]);
+        gm.mob(vec![String::from("ab")]);
     }
 
     #[test]
@@ -190,16 +159,14 @@ mod test {
         gm.file_actions
             .write(
                 Path::new(""),
-                r#"
-        {
-          "coauthors": {
-          }
-        }
-        "#
+                json!({
+                    "coauthors": {
+                    }
+                })
                 .to_string(),
             )
             .unwrap();
 
-        gm.mob(vec!["ab".to_string()]);
+        gm.mob(vec![String::from("ab")]);
     }
 }

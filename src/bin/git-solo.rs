@@ -1,29 +1,28 @@
-use clap::{AppSettings, Clap};
+use clap::Parser;
 use git_mob_rs::GitMob;
 
 /// Reset back to just yourself (clears the gitmessage template)
-#[derive(Clap)]
-#[clap(setting = AppSettings::ColoredHelp)]
-struct Opts {}
+#[derive(Parser)]
+#[command(version, long_about = None)]
+struct Cli {}
 
 trait Solo {
-    fn solo(&self);
+    fn solo(&self) -> String;
 }
 
 impl Solo for GitMob {
-    fn solo(&self) {
+    fn solo(&self) -> String {
         self.write_gitmessage(String::from(""));
+        self.get_formatted_gitmessage()
     }
 }
 
 fn main() {
-    Opts::parse();
+    Cli::parse();
 
     let gm = GitMob::default();
 
-    gm.solo();
-
-    gm.print_output();
+    println!("{}", gm.solo());
 }
 
 #[cfg(test)]
@@ -34,9 +33,9 @@ mod test {
     #[test]
     fn test_solo() {
         let gm = get_git_mob();
-        gm.solo();
+        let actual = gm.solo();
 
         assert_eq!("", gm.get_gitmessage());
-        assert_eq!(gm.get_git_user(), gm.get_output());
+        assert_eq!(gm.get_git_user(), actual);
     }
 }

@@ -1,10 +1,11 @@
-use clap::{AppSettings, Clap};
+use clap::Parser;
 use git_mob_rs::GitMob;
+use serde_json::{json, to_string_pretty};
 
 /// Edit the coauthors config file
-#[derive(Clap)]
-#[clap(setting = AppSettings::ColoredHelp)]
-struct Opts {}
+#[derive(Parser)]
+#[command(version, long_about = None)]
+struct Cli {}
 
 trait Edit {
     fn edit(&self);
@@ -16,9 +17,16 @@ impl Edit for GitMob {
 
         // write part of the config for convenience
         if !coauthors_path.exists() {
-            let s = "{\n  \"coauthors\": {\n    \"\": {\n      \"name\": \"\",\n      \"email\": \"\"\n    }\n  }\n}\n";
+            let s = json!({
+                "coauthors": {
+                    "": {
+                        "name": "",
+                        "email": ""
+                    }
+                }
+            });
             self.file_actions
-                .write(&coauthors_path, s.to_string())
+                .write(&coauthors_path, to_string_pretty(&s).unwrap())
                 .unwrap();
         }
 
@@ -28,22 +36,14 @@ impl Edit for GitMob {
         );
 
         match open::that(coauthors_path) {
-            Ok(exit_status) => {
-                if !exit_status.success() {
-                    if let Some(code) = exit_status.code() {
-                        panic!("Command returned non-zero exit status {}!", code);
-                    } else {
-                        panic!("Command returned with unknown exit status!");
-                    }
-                }
-            }
+            Ok(()) => {}
             Err(why) => panic!("Failure to execute command: {}", why),
         }
     }
 }
 
 fn main() {
-    Opts::parse();
+    Cli::parse();
 
     let gm = GitMob::default();
 

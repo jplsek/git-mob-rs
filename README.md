@@ -22,7 +22,7 @@ Well, if you need a more feature complete version, use theirs!
 $ git edit-coauthors
 ```
 
-This will edit `~/.config/git-coauthors` with your default text editor.
+This will edit `~/.config/git-coauthors` (on Linux) with your default text editor.
 Use the following json syntax to make the file.
 
 ```json
@@ -35,6 +35,8 @@ Use the following json syntax to make the file.
   }
 }
 ```
+
+The commands listed [here](https://github.com/rkotze/git-mob/tree/master/packages/git-mob#add-co-author) to add/edit/delete also work.
 
 ### Mobbing co-author
 
@@ -86,7 +88,6 @@ cargo install --path .
 ## Differences
 
 - The XDG config directory is used by default (`~/.config/git-coauthors`) for the configuration, falling back to `~/.git-coauthors` if it exists.
-- I personally never used the add/delete/edit coauthor commands from the original, as I edited the config file directly, so I did not include those commands. Instead, I added a `git edit-coauthors` command.
 - Since I primarily use the CLI, I won't make editor plugins related to git-mob-rs.
 
 If someone else feels like making some of these missing features, feel free to submit a PR!
