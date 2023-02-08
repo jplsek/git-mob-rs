@@ -149,7 +149,7 @@ impl GitMob {
         // these errors should only really happen in ci
         cfg.get_string(key).unwrap_or_else(|_| {
             println!("Warning: your git config \"{key}\" is missing!");
-            "".to_string()
+            String::from("")
         })
     }
 
@@ -190,7 +190,10 @@ impl GitMob {
     pub fn get_all_coauthors(&self) -> LinkedHashMap<String, Author> {
         let coauthors_path = self.get_coauthors_path();
         let coauthors_path = coauthors_path.as_path();
-        let coauthors_str = self.file_actions.read(coauthors_path).unwrap();
+        let coauthors_str = self
+            .file_actions
+            .read(coauthors_path)
+            .unwrap_or_else(|_| String::from(""));
 
         if coauthors_str.is_empty() {
             return LinkedHashMap::new();
@@ -244,7 +247,7 @@ mod test {
     #[test]
     fn test_write_gitmessage() {
         let gm = get_git_mob();
-        gm.write_gitmessage("test".to_string());
+        gm.write_gitmessage(String::from("test"));
 
         assert_eq!("\n\ntest", gm.get_gitmessage());
         assert_eq!(
@@ -281,14 +284,14 @@ mod test {
             String::from("ab"),
             Author {
                 name: String::from("A B"),
-                email: "ab@example.com".to_string(),
+                email: String::from("ab@example.com"),
             },
         );
         expected_coauthors.insert(
             String::from("cd"),
             Author {
                 name: String::from("C D"),
-                email: "cd@example.com".to_string(),
+                email: String::from("cd@example.com"),
             },
         );
 

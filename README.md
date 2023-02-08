@@ -64,6 +64,8 @@ $ git solo
 brew install jplsek/tap/git-mob-rs
 ```
 
+Since libssh2 (as used by libgit2) only uses OpenSSL (instead of utilizing MacOS LibreSSL), you'll need to update your `PATH` to use it. Run `brew info openssl` to see how to update your `PATH`.
+
 ### Linux
 
 See the [release page](https://github.com/jplsek/git-mob-rs/releases) for binaries or build from source.
