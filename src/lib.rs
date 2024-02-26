@@ -1,5 +1,6 @@
 use dirs::{config_dir, home_dir};
-use git2::{Config, ErrorCode, Repository};
+use gix::{self, config, Repository};
+use gix_config::Source;
 use linked_hash_map::LinkedHashMap;
 use serde::{Deserialize, Serialize};
 use serde_json::to_string_pretty;
@@ -68,7 +69,7 @@ impl Default for GitMob {
 
 impl GitMob {
     pub fn get_repo(&self) -> Repository {
-        Repository::open_from_env().unwrap_or_else(|_| {
+        gix::discover(".").unwrap_or_else(|_| {
             panic!("Not in a git repository");
         })
     }
@@ -105,20 +106,32 @@ impl GitMob {
     }
 
     fn set_git_template(&self) {
-        let mut cfg = self.get_repo().config().unwrap();
-        let key = "commit.template";
+        let repo = self.get_repo();
+        let repo_git_path = repo.path();
+        let config_path = repo_git_path.join("config");
 
-        // don't write to if we don't have to
-        match cfg.get_entry(key) {
-            Ok(_) => return,
-            Err(err) => {
-                if err.code() != ErrorCode::NotFound {
-                    panic!("{}", err);
-                }
-            }
-        };
+        self.set_git_template_config(&config_path);
+    }
 
-        cfg.set_str(key, ".git/.gitmessage").unwrap();
+    fn set_git_template_config(&self, config_path: &PathBuf) {
+        let mut config =
+            gix_config::File::from_path_no_includes(config_path.to_path_buf(), Source::Local)
+                .unwrap();
+
+        config
+            .set_raw_value("commit", None, "template", ".git/.gitmessage")
+            .unwrap();
+
+        let mut config_file = File::create(config_path).unwrap_or_else(|error| {
+            panic!(
+                "{}\nFailed to open {} for writing.",
+                error,
+                config_path.display()
+            )
+        });
+        config.write_to(&mut config_file).unwrap_or_else(|error| {
+            panic!("{}\nFailed to write to {}.", error, config_path.display())
+        });
     }
 
     /// Returns the coauthors path
@@ -145,16 +158,20 @@ impl GitMob {
         }
     }
 
-    fn get_git_config(&self, cfg: &Config, key: &str) -> String {
-        // these errors should only really happen in ci
-        cfg.get_string(key).unwrap_or_else(|_| {
-            println!("Warning: your git config \"{key}\" is missing!");
-            String::from("")
-        })
+    fn get_git_config(&self, cfg: &config::Snapshot, key: &str) -> String {
+        match cfg.string(key) {
+            Some(value) => value.to_string(),
+            None => {
+                // these errors should only really happen in ci
+                println!("Warning: your git config \"{key}\" is missing!");
+                String::from("")
+            }
+        }
     }
 
     pub fn get_git_user(&self) -> String {
-        let cfg = self.get_repo().config().unwrap();
+        let repo = self.get_repo();
+        let cfg = repo.config_snapshot();
 
         let user = self.get_git_config(&cfg, "user.name");
         let email = self.get_git_config(&cfg, "user.email");
@@ -242,6 +259,7 @@ pub mod test_utils {
 mod test {
     use super::*;
     use serde_json::json;
+    use tempfile::tempdir;
     use test_utils::get_git_mob;
 
     #[test]
@@ -296,5 +314,41 @@ mod test {
         );
 
         assert_eq!(expected_coauthors, gm.get_all_coauthors());
+    }
+
+    #[test]
+    fn test_set_git_template_config() {
+        // make sure the config doesn't get wiped
+
+        let default_config = "
+[core]
+\trepositoryformatversion = 0
+\tfilemode = true
+\tbare = false
+\tlogallrefupdates = true
+";
+        let expected_config = "
+[core]
+\trepositoryformatversion = 0
+\tfilemode = true
+\tbare = false
+\tlogallrefupdates = true
+[commit]
+\ttemplate = .git/.gitmessage
+";
+
+        let dir = tempdir().unwrap();
+        let config_file_path = dir.path().join("config");
+        {
+            let mut config_file = File::create(&config_file_path).unwrap();
+            config_file.write(default_config.as_bytes()).unwrap();
+        }
+
+        let gm = get_git_mob();
+        gm.set_git_template_config(&config_file_path);
+
+        let actual_config = fs::read_to_string(config_file_path).unwrap();
+
+        assert_eq!(expected_config, actual_config);
     }
 }
