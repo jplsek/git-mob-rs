@@ -1,4 +1,5 @@
 use dirs::{config_dir, home_dir};
+use gix::bstr::ByteSlice;
 use gix::{self, config, Repository};
 use gix_config::Source;
 use linked_hash_map::LinkedHashMap;
@@ -118,8 +119,17 @@ impl GitMob {
             gix_config::File::from_path_no_includes(config_path.to_path_buf(), Source::Local)
                 .unwrap();
 
+        let template = ".git/.gitmessage";
+
+        // don't write to file if we don't have to
+        if let Ok(value) = config.raw_value("commit", None, "template") {
+            if value.as_bstr() == template {
+                return;
+            }
+        }
+
         config
-            .set_raw_value("commit", None, "template", ".git/.gitmessage")
+            .set_raw_value("commit", None, "template", template)
             .unwrap();
 
         let mut config_file = File::create(config_path).unwrap_or_else(|error| {
@@ -348,7 +358,41 @@ mod test {
         gm.set_git_template_config(&config_file_path);
 
         let actual_config = fs::read_to_string(config_file_path).unwrap();
+        assert_eq!(expected_config, actual_config);
+    }
 
+    #[test]
+    fn test_replace_git_template_config() {
+        let default_config = "
+[core]
+\trepositoryformatversion = 0
+\tfilemode = true
+\tbare = false
+\tlogallrefupdates = true
+[commit]
+\ttemplate = .git/.somethingelse
+";
+        let expected_config = "
+[core]
+\trepositoryformatversion = 0
+\tfilemode = true
+\tbare = false
+\tlogallrefupdates = true
+[commit]
+\ttemplate = .git/.gitmessage
+";
+
+        let dir = tempdir().unwrap();
+        let config_file_path = dir.path().join("config");
+        {
+            let mut config_file = File::create(&config_file_path).unwrap();
+            config_file.write(default_config.as_bytes()).unwrap();
+        }
+
+        let gm = get_git_mob();
+        gm.set_git_template_config(&config_file_path);
+
+        let actual_config = fs::read_to_string(config_file_path).unwrap();
         assert_eq!(expected_config, actual_config);
     }
 }
