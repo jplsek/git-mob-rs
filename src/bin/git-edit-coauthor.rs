@@ -1,5 +1,5 @@
 use clap::Parser;
-use git_mob_rs::GitMob;
+use git_mob_rs::{exit_with_error::ExitWithError, file_actions::FileActions, GitMob};
 
 /// Edits a coauthor in the coauthors config file.
 /// For example: git edit-coauthor jd --name "John Doe" --email jdoe@example.com
@@ -20,7 +20,7 @@ trait Edit {
     fn edit(&self, initials: String, name: Option<String>, email: Option<String>) -> String;
 }
 
-impl Edit for GitMob {
+impl<T: FileActions, U: ExitWithError> Edit for GitMob<T, U> {
     fn edit(&self, initials: String, name: Option<String>, email: Option<String>) -> String {
         let coauthors_path = self.get_coauthors_path();
 
@@ -36,11 +36,11 @@ impl Edit for GitMob {
                 }
             }
             None => {
-                panic!(
-                    "Author with initials \"{}\" not found in {}!",
+                self.exit_with_error.message(format!(
+                    "Author with initials \"{}\" not found in \"{}\"!",
                     initials,
                     coauthors_path.display()
-                );
+                ));
             }
         };
 

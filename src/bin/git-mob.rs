@@ -1,5 +1,5 @@
 use clap::Parser;
-use git_mob_rs::GitMob;
+use git_mob_rs::{exit_with_error::ExitWithError, file_actions::FileActions, GitMob};
 
 /// Quickly populates the .git/gitmessage template file
 #[derive(Parser)]
@@ -17,7 +17,7 @@ trait Mob {
     fn list(&self) -> String;
 }
 
-impl Mob for GitMob {
+impl<T: FileActions, U: ExitWithError> Mob for GitMob<T, U> {
     fn list(&self) -> String {
         let coauthors = self.get_all_coauthors();
         let mut s = String::new();
@@ -48,11 +48,11 @@ impl Mob for GitMob {
             } else {
                 let coauthors_path = self.get_coauthors_path();
                 let coauthors_path = coauthors_path.as_path();
-                panic!(
-                    "Author with initials \"{}\" not found in {}!",
+                self.exit_with_error.message(format!(
+                    "Author with initials \"{}\" not found in \"{}\"!",
                     initial,
                     coauthors_path.display()
-                );
+                ));
             }
         }
 

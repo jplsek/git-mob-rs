@@ -1,4 +1,9 @@
+pub mod exit_with_error;
+pub mod file_actions;
+
 use dirs::{config_dir, home_dir};
+use exit_with_error::{ExitWithError, ExitWithErrorImpl};
+use file_actions::{FileActions, FileSystemActions};
 use gix::bstr::ByteSlice;
 use gix::{self, config, Repository};
 use gix_config::Source;
@@ -6,9 +11,7 @@ use linked_hash_map::LinkedHashMap;
 use serde::{Deserialize, Serialize};
 use serde_json::to_string_pretty;
 use std::error::Error;
-use std::fs;
 use std::fs::File;
-use std::io::prelude::*;
 use std::path::{Path, PathBuf};
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -22,56 +25,28 @@ pub struct Author {
     pub email: String,
 }
 
-// This mostly exists to make a mock for unit testing
-pub trait FileActions {
-    fn write(&self, path: &Path, s: String) -> Result<(), Box<dyn Error>>;
-    fn read(&self, path: &Path) -> Result<String, Box<dyn Error>>;
+// Use dependency injection to put the real impl for Default and the mock impl in tests
+// This doesn't use dyn Box to make it slightly more performant and to
+// avoid object safe trait issues when using ExitWithError.
+// But this approach does make it a bit more verbose...
+pub struct GitMob<T: FileActions, U: ExitWithError> {
+    pub file_actions: T,
+    pub exit_with_error: U,
 }
 
-pub struct GmFileActions();
-
-impl FileActions for GmFileActions {
-    fn write(&self, path: &Path, s: String) -> Result<(), Box<dyn Error>> {
-        let path_display = path.display();
-        if let Err(why) = fs::write(path, s.as_bytes()) {
-            return Err(Box::from(format!(
-                "couldn't write to {path_display}: {why}"
-            )));
-        }
-        Ok(())
-    }
-
-    fn read(&self, path: &Path) -> Result<String, Box<dyn Error>> {
-        let path_display = path.display();
-        let mut file = match File::open(path) {
-            Err(why) => return Err(Box::from(format!("couldn't open {path_display}: {why}"))),
-            Ok(file) => file,
-        };
-
-        let mut s = String::new();
-        match file.read_to_string(&mut s) {
-            Err(why) => Err(Box::from(format!("couldn't read {path_display}: {why}"))),
-            Ok(_) => Ok(s),
-        }
-    }
-}
-
-pub struct GitMob {
-    pub file_actions: Box<dyn FileActions>,
-}
-
-impl Default for GitMob {
+impl Default for GitMob<FileSystemActions, ExitWithErrorImpl> {
     fn default() -> Self {
         GitMob {
-            file_actions: Box::from(GmFileActions()),
+            file_actions: FileSystemActions(),
+            exit_with_error: ExitWithErrorImpl(),
         }
     }
 }
 
-impl GitMob {
+impl<T: FileActions, U: ExitWithError> GitMob<T, U> {
     pub fn get_repo(&self) -> Repository {
         gix::discover(".").unwrap_or_else(|_| {
-            panic!("Not in a git repository");
+            self.exit_with_error.message("Not in a git repository");
         })
     }
 
@@ -85,14 +60,7 @@ impl GitMob {
         // for git solo
         let s = if s.is_empty() { s } else { format!("\n\n{s}") };
 
-        self.file_actions
-            .write(&gitmessage_path, s)
-            .unwrap_or_else(|error| {
-                panic!(
-                    "{}\nMake sure you are in a git repository when running this command",
-                    error
-                )
-            });
+        self.file_actions.write(&gitmessage_path, s).unwrap();
 
         self.set_git_template();
     }
@@ -132,16 +100,8 @@ impl GitMob {
             .set_raw_value("commit", None, "template", template)
             .unwrap();
 
-        let mut config_file = File::create(config_path).unwrap_or_else(|error| {
-            panic!(
-                "{}\nFailed to open {} for writing.",
-                error,
-                config_path.display()
-            )
-        });
-        config.write_to(&mut config_file).unwrap_or_else(|error| {
-            panic!("{}\nFailed to write to {}.", error, config_path.display())
-        });
+        let mut config_file = File::create(config_path).unwrap();
+        config.write_to(&mut config_file).unwrap();
     }
 
     /// Returns the coauthors path
@@ -194,10 +154,10 @@ impl GitMob {
         self.file_actions
             .read(&gitmessage_path)
             .unwrap_or_else(|error| {
-                panic!(
-                    "{}\nMake sure you are in a git repository when running this command.",
+                self.exit_with_error.message(format!(
+                    "Make sure to run 'git mob <initials>' first.\n\nError: {}",
                     error
-                )
+                ));
             })
     }
 
@@ -239,14 +199,6 @@ pub mod test_utils {
         s: RefCell<String>,
     }
 
-    impl Default for test_utils::MockFileActions {
-        fn default() -> Self {
-            MockFileActions {
-                s: RefCell::new(String::new()),
-            }
-        }
-    }
-
     impl FileActions for MockFileActions {
         fn write(&self, _: &Path, s: String) -> Result<(), Box<dyn Error>> {
             self.s.replace(s);
@@ -258,15 +210,28 @@ pub mod test_utils {
         }
     }
 
-    pub fn get_git_mob() -> GitMob {
+    pub struct MockExitWithError {}
+
+    impl ExitWithError for MockExitWithError {
+        fn message<S: AsRef<str>>(&self, message: S) -> ! {
+            panic!("{}", message.as_ref());
+        }
+    }
+
+    pub fn get_git_mob() -> GitMob<MockFileActions, MockExitWithError> {
         GitMob {
-            file_actions: Box::from(MockFileActions::default()),
+            file_actions: MockFileActions {
+                s: RefCell::new(String::new()),
+            },
+            exit_with_error: MockExitWithError {},
         }
     }
 }
 
 #[cfg(test)]
 mod test {
+    use std::{fs, io::Write};
+
     use super::*;
     use serde_json::json;
     use tempfile::tempdir;

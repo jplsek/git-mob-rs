@@ -1,5 +1,5 @@
 use clap::Parser;
-use git_mob_rs::GitMob;
+use git_mob_rs::{exit_with_error::ExitWithError, file_actions::FileActions, GitMob};
 
 /// Print the .gitmessage template
 #[derive(Parser)]
@@ -10,7 +10,7 @@ trait Print {
     fn print(&self) -> String;
 }
 
-impl Print for GitMob {
+impl<T: FileActions, U: ExitWithError> Print for GitMob<T, U> {
     fn print(&self) -> String {
         format!("{}\n", self.get_gitmessage())
     }

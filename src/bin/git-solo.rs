@@ -1,5 +1,5 @@
 use clap::Parser;
-use git_mob_rs::GitMob;
+use git_mob_rs::{exit_with_error::ExitWithError, file_actions::FileActions, GitMob};
 
 /// Reset back to just yourself (clears the gitmessage template)
 #[derive(Parser)]
@@ -10,7 +10,7 @@ trait Solo {
     fn solo(&self) -> String;
 }
 
-impl Solo for GitMob {
+impl<T: FileActions, U: ExitWithError> Solo for GitMob<T, U> {
     fn solo(&self) -> String {
         self.write_gitmessage(String::from(""));
         self.get_formatted_gitmessage()

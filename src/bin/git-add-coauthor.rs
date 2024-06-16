@@ -1,5 +1,5 @@
 use clap::Parser;
-use git_mob_rs::{Author, GitMob};
+use git_mob_rs::{exit_with_error::ExitWithError, file_actions::FileActions, Author, GitMob};
 
 /// Adds a coauthor to the coauthors config file.
 /// For example: git add-coauthor jd "John Doe" jdoe@example.com
@@ -18,7 +18,7 @@ trait Add {
     fn add(&self, initials: String, name: String, email: String) -> String;
 }
 
-impl Add for GitMob {
+impl<T: FileActions, U: ExitWithError> Add for GitMob<T, U> {
     fn add(&self, initials: String, name: String, email: String) -> String {
         let coauthors_path = self.get_coauthors_path();
         let coauthors_path = coauthors_path.display();

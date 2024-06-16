@@ -1,5 +1,5 @@
 use clap::Parser;
-use git_mob_rs::GitMob;
+use git_mob_rs::{exit_with_error::ExitWithError, file_actions::FileActions, GitMob};
 use serde_json::{json, to_string_pretty};
 
 /// Edit the coauthors config file
@@ -11,7 +11,7 @@ trait Edit {
     fn edit(&self);
 }
 
-impl Edit for GitMob {
+impl<T: FileActions, U: ExitWithError> Edit for GitMob<T, U> {
     fn edit(&self) {
         let coauthors_path = self.get_coauthors_path();
 
@@ -35,10 +35,7 @@ impl Edit for GitMob {
             coauthors_path.display()
         );
 
-        match open::that(coauthors_path) {
-            Ok(()) => {}
-            Err(why) => panic!("Failure to execute command: {}", why),
-        }
+        open::that(coauthors_path).unwrap();
     }
 }
 

@@ -1,5 +1,5 @@
 use clap::Parser;
-use git_mob_rs::GitMob;
+use git_mob_rs::{exit_with_error::ExitWithError, file_actions::FileActions, GitMob};
 
 /// Delete a coauthor from the coauthors config file.
 /// For example: git delete-coauthor jd
@@ -14,7 +14,7 @@ trait Delete {
     fn delete(&self, initials: Vec<String>) -> String;
 }
 
-impl Delete for GitMob {
+impl<T: FileActions, U: ExitWithError> Delete for GitMob<T, U> {
     fn delete(&self, initials: Vec<String>) -> String {
         let coauthors_path = self.get_coauthors_path();
         let coauthors_path = coauthors_path.display();
