@@ -10,6 +10,7 @@ use gix_config::Source;
 use linked_hash_map::LinkedHashMap;
 use serde::{Deserialize, Serialize};
 use serde_json::to_string_pretty;
+use std::env;
 use std::error::Error;
 use std::fs::File;
 use std::path::{Path, PathBuf};
@@ -146,6 +147,10 @@ impl<T: FileActions, U: ExitWithError> GitMob<T, U> {
     /// This supports both xdg (prioritized) or if the config is in the home directory (like
     /// git-mob).
     pub fn get_coauthors_path(&self) -> PathBuf {
+        if let Ok(path) = env::var("GITMOB_COAUTHORS_PATH") {
+            return PathBuf::from(path);
+        }
+
         let file_name = "git-coauthors";
 
         // most likely on fresh install after first use

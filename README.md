@@ -88,6 +88,7 @@ cargo install --path .
 ## Differences
 
 - The XDG config directory is used by default (`~/.config/git-coauthors`) for the configuration, falling back to `~/.git-coauthors` if it exists.
+  - Setting the `GITMOB_COAUTHORS_PATH` environment variable will override this behavior.
 - Since I primarily use the CLI, I won't make editor plugins related to git-mob-rs.
 
 If someone else feels like making some of these missing features, feel free to submit a PR!
