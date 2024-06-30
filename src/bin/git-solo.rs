@@ -12,7 +12,7 @@ trait Solo {
 
 impl<T: FileActions, U: ExitWithError> Solo for GitMob<T, U> {
     fn solo(&self) -> String {
-        self.write_gitmessage(String::from(""));
+        self.write_gitmessage(vec![]);
         self.get_formatted_gitmessage()
     }
 }

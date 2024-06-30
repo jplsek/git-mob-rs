@@ -57,6 +57,8 @@ mod test {
         let gm = get_git_mob();
         let coauthors_path = gm.get_coauthors_path();
 
+        gm.file_actions.write(&coauthors_path, "").unwrap();
+
         let mut expected_coauthors = LinkedHashMap::new();
         expected_coauthors.insert(
             String::from("ab"),

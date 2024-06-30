@@ -36,7 +36,7 @@ Use the following json syntax to make the file.
 }
 ```
 
-The commands listed [here](https://github.com/rkotze/git-mob/tree/master/packages/git-mob#add-co-author) to add/edit/delete also work.
+The commands listed [here](https://github.com/rkotze/git-mob/tree/master/packages/git-mob#add-co-author) to add/edit/delete/[print](https://github.com/rkotze/git-mob/tree/master/packages/git-mob#add-initials-of-current-mob-to-your-prompt) also work.
 
 ### Mobbing co-author
 

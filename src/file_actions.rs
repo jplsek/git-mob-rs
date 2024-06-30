@@ -5,16 +5,16 @@ use std::io::prelude::*;
 use std::path::Path;
 
 pub trait FileActions {
-    fn write(&self, path: &Path, s: String) -> Result<(), Box<dyn Error>>;
+    fn write<S: AsRef<str>>(&self, path: &Path, s: S) -> Result<(), Box<dyn Error>>;
     fn read(&self, path: &Path) -> Result<String, Box<dyn Error>>;
 }
 
 pub struct FileSystemActions();
 
 impl FileActions for FileSystemActions {
-    fn write(&self, path: &Path, s: String) -> Result<(), Box<dyn Error>> {
+    fn write<S: AsRef<str>>(&self, path: &Path, s: S) -> Result<(), Box<dyn Error>> {
         let path_display = path.display();
-        if let Err(why) = fs::write(path, s.as_bytes()) {
+        if let Err(why) = fs::write(path, s.as_ref().as_bytes()) {
             return Err(Box::from(format!(
                 "couldn't write to {path_display}: {why}"
             )));

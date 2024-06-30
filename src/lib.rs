@@ -54,13 +54,50 @@ impl<T: FileActions, U: ExitWithError> GitMob<T, U> {
         self.get_repo().path().join(".gitmessage")
     }
 
-    pub fn write_gitmessage(&self, s: String) {
+    pub fn get_gitinitials_path(&self) -> PathBuf {
+        self.get_repo().path().join(".gitinitials")
+    }
+
+    pub fn write_gitmessage(&self, initials: Vec<String>) {
+        let authors = if initials.is_empty() {
+            // for git solo
+            String::new()
+        } else {
+            let coauthors = self.get_all_coauthors();
+
+            let name_emails = initials
+                .clone()
+                .into_iter()
+                .map(|initial| {
+                    if coauthors.contains_key(&initial) {
+                        let author = &coauthors[&initial];
+                        let name = &author.name;
+                        let email = &author.email;
+                        format!("Co-authored-by: {name} <{email}>")
+                    } else {
+                        let coauthors_path = self.get_coauthors_path();
+                        let coauthors_path = coauthors_path.as_path();
+                        self.exit_with_error.message(format!(
+                            "Author with initials \"{}\" not found in \"{}\"!",
+                            initial,
+                            coauthors_path.display()
+                        ));
+                    }
+                })
+                .collect::<Vec<String>>()
+                .join("\n");
+            format!("\n\n{name_emails}")
+        };
+
+        let initials_str = initials.join(",");
+
         let gitmessage_path = self.get_gitmessage_path();
+        let gitinitials_path = self.get_gitinitials_path();
 
-        // for git solo
-        let s = if s.is_empty() { s } else { format!("\n\n{s}") };
-
-        self.file_actions.write(&gitmessage_path, s).unwrap();
+        self.file_actions.write(&gitmessage_path, authors).unwrap();
+        self.file_actions
+            .write(&gitinitials_path, format!("{initials_str}\n"))
+            .unwrap();
 
         self.set_git_template();
     }
@@ -150,15 +187,29 @@ impl<T: FileActions, U: ExitWithError> GitMob<T, U> {
     }
 
     pub fn get_gitmessage(&self) -> String {
-        let gitmessage_path = self.get_gitmessage_path();
         self.file_actions
-            .read(&gitmessage_path)
+            .read(&self.get_gitmessage_path())
             .unwrap_or_else(|error| {
                 self.exit_with_error.message(format!(
                     "Make sure to run 'git mob <initials>' first.\n\nError: {}",
                     error
                 ));
             })
+    }
+
+    pub fn get_gitinitials(&self) -> String {
+        // git-mob-print -i (using in a shell prompt) situations:
+        // - Not in the repo
+        // - In repo, but hasn't run git-mob
+
+        if gix::discover(".").is_err() {
+            return String::new();
+        }
+
+        match self.file_actions.read(&self.get_gitinitials_path()) {
+            Ok(s) => s,
+            Err(_) => String::new(),
+        }
     }
 
     pub fn get_formatted_gitmessage(&self) -> String {
@@ -193,20 +244,29 @@ impl<T: FileActions, U: ExitWithError> GitMob<T, U> {
 
 pub mod test_utils {
     use super::*;
+    use serde_json::json;
     use std::cell::RefCell;
+    use std::collections::HashMap;
 
     pub struct MockFileActions {
-        s: RefCell<String>,
+        s: RefCell<HashMap<String, String>>,
     }
 
     impl FileActions for MockFileActions {
-        fn write(&self, _: &Path, s: String) -> Result<(), Box<dyn Error>> {
-            self.s.replace(s);
+        fn write<S: AsRef<str>>(&self, path: &Path, s: S) -> Result<(), Box<dyn Error>> {
+            println!("saving to test map {}", path.display());
+            self.s
+                .borrow_mut()
+                .insert(path.display().to_string(), s.as_ref().to_string());
             Ok(())
         }
 
-        fn read(&self, _: &Path) -> Result<String, Box<dyn Error>> {
-            Ok(self.s.borrow().clone())
+        fn read(&self, path: &Path) -> Result<String, Box<dyn Error>> {
+            let key = path.display().to_string();
+            match self.s.borrow().get(&key) {
+                Some(s) => Ok(s.to_string()),
+                None => panic!("!!! TEST SETUP ERROR: {} not found in map", key),
+            }
         }
     }
 
@@ -219,42 +279,14 @@ pub mod test_utils {
     }
 
     pub fn get_git_mob() -> GitMob<MockFileActions, MockExitWithError> {
-        GitMob {
+        let gm = GitMob {
             file_actions: MockFileActions {
-                s: RefCell::new(String::new()),
+                s: RefCell::new(HashMap::new()),
             },
             exit_with_error: MockExitWithError {},
-        }
-    }
-}
+        };
 
-#[cfg(test)]
-mod test {
-    use std::{fs, io::Write};
-
-    use super::*;
-    use serde_json::json;
-    use tempfile::tempdir;
-    use test_utils::get_git_mob;
-
-    #[test]
-    fn test_write_gitmessage() {
-        let gm = get_git_mob();
-        gm.write_gitmessage(String::from("test"));
-
-        assert_eq!("\n\ntest", gm.get_gitmessage());
-        assert_eq!(
-            format!("{}\ntest", gm.get_git_user()),
-            gm.get_formatted_gitmessage()
-        );
-    }
-
-    #[test]
-    fn test_get_all_coauthors() {
-        let gm = get_git_mob();
-
-        assert_eq!(LinkedHashMap::new(), gm.get_all_coauthors());
-
+        // set up
         let coauthors = json!({
             "coauthors": {
                 "ab": {
@@ -269,8 +301,40 @@ mod test {
         });
 
         gm.file_actions
-            .write(Path::new(""), coauthors.to_string())
+            .write(&gm.get_coauthors_path(), coauthors.to_string())
             .unwrap();
+
+        gm
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use std::{fs, io::Write};
+
+    use super::*;
+    use tempfile::tempdir;
+    use test_utils::get_git_mob;
+
+    #[test]
+    fn test_write_gitmessage() {
+        let gm = get_git_mob();
+
+        let authors = "Co-authored-by: A B <ab@example.com>\nCo-authored-by: C D <cd@example.com>";
+
+        gm.write_gitmessage(vec![String::from("ab"), String::from("cd")]);
+
+        assert_eq!(format!("\n\n{}", authors), gm.get_gitmessage());
+        assert_eq!("ab,cd\n", gm.get_gitinitials());
+        assert_eq!(
+            format!("{}\n{}", gm.get_git_user(), authors),
+            gm.get_formatted_gitmessage()
+        );
+    }
+
+    #[test]
+    fn test_get_all_coauthors() {
+        let gm = get_git_mob();
 
         let mut expected_coauthors = LinkedHashMap::new();
         expected_coauthors.insert(
@@ -289,6 +353,11 @@ mod test {
         );
 
         assert_eq!(expected_coauthors, gm.get_all_coauthors());
+
+        // test empty
+        gm.file_actions.write(&gm.get_coauthors_path(), "").unwrap();
+
+        assert_eq!(LinkedHashMap::new(), gm.get_all_coauthors());
     }
 
     #[test]

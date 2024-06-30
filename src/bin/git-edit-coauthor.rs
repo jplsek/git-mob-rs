@@ -60,8 +60,6 @@ fn main() {
 
 #[cfg(test)]
 mod test {
-    use std::path::Path;
-
     use super::*;
     use git_mob_rs::{test_utils::get_git_mob, Author};
     use linked_hash_map::LinkedHashMap;
@@ -85,7 +83,7 @@ mod test {
         });
 
         gm.file_actions
-            .write(Path::new(""), coauthors.to_string())
+            .write(&gm.get_coauthors_path(), coauthors.to_string())
             .unwrap();
 
         let mut expected_coauthors = LinkedHashMap::new();
@@ -129,7 +127,7 @@ mod test {
         });
 
         gm.file_actions
-            .write(Path::new(""), coauthors.to_string())
+            .write(&gm.get_coauthors_path(), coauthors.to_string())
             .unwrap();
 
         let mut expected_coauthors = LinkedHashMap::new();
@@ -162,7 +160,7 @@ mod test {
         });
 
         gm.file_actions
-            .write(Path::new(""), coauthors.to_string())
+            .write(&gm.get_coauthors_path(), coauthors.to_string())
             .unwrap();
 
         let mut expected_coauthors = LinkedHashMap::new();
@@ -189,6 +187,6 @@ mod test {
     #[should_panic]
     fn test_edit_author_who_does_not_exist() {
         let gm = get_git_mob();
-        gm.edit(String::from("ab"), None, None);
+        gm.edit(String::from("ef"), None, None);
     }
 }

@@ -20,13 +20,15 @@ trait Mob {
 impl<T: FileActions, U: ExitWithError> Mob for GitMob<T, U> {
     fn list(&self) -> String {
         let coauthors = self.get_all_coauthors();
-        let mut s = String::new();
-        for (initials, author) in coauthors {
-            let name = author.name;
-            let email = author.email;
-            s.push_str(format!("{initials} {name} <{email}>\n").as_str());
-        }
-        s
+        let initials: Vec<String> = coauthors
+            .into_iter()
+            .map(|(initials, author)| {
+                let name = author.name;
+                let email = author.email;
+                format!("{initials} {name} <{email}>")
+            })
+            .collect();
+        format!("{}\n", initials.join("\n"))
     }
 
     fn mob(&self, initials: Vec<String>) -> String {
@@ -35,28 +37,7 @@ impl<T: FileActions, U: ExitWithError> Mob for GitMob<T, U> {
             return self.get_formatted_gitmessage();
         }
 
-        let coauthors = self.get_all_coauthors();
-
-        let mut name_emails: Vec<String> = vec![];
-
-        for initial in initials.iter() {
-            if coauthors.contains_key(initial) {
-                let author = &coauthors[initial];
-                let name = &author.name;
-                let email = &author.email;
-                name_emails.push(format!("Co-authored-by: {name} <{email}>"));
-            } else {
-                let coauthors_path = self.get_coauthors_path();
-                let coauthors_path = coauthors_path.as_path();
-                self.exit_with_error.message(format!(
-                    "Author with initials \"{}\" not found in \"{}\"!",
-                    initial,
-                    coauthors_path.display()
-                ));
-            }
-        }
-
-        self.write_gitmessage(name_emails.join("\n"));
+        self.write_gitmessage(initials);
         self.get_formatted_gitmessage()
     }
 }
@@ -78,28 +59,10 @@ mod test {
     use super::*;
     use git_mob_rs::test_utils::get_git_mob;
     use serde_json::json;
-    use std::path::Path;
 
     #[test]
     fn test_mob() {
         let gm = get_git_mob();
-
-        let json = json!({
-            "coauthors": {
-                "ab": {
-                    "name": "A B",
-                    "email": "ab@example.com"
-                },
-                "cd": {
-                    "name": "C D",
-                    "email": "cd@example.com"
-                }
-            }
-        });
-
-        gm.file_actions
-            .write(Path::new(""), json.to_string())
-            .unwrap();
 
         let authors = "Co-authored-by: A B <ab@example.com>\nCo-authored-by: C D <cd@example.com>";
 
@@ -121,23 +84,6 @@ mod test {
     fn test_list() {
         let gm = get_git_mob();
 
-        let coauthors = json!({
-            "coauthors": {
-                "ab": {
-                    "name": "A B",
-                    "email": "ab@example.com"
-                },
-                "cd": {
-                    "name": "C D",
-                    "email": "cd@example.com"
-                }
-            }
-        });
-
-        gm.file_actions
-            .write(Path::new(""), coauthors.to_string())
-            .unwrap();
-
         let author1 = "ab A B <ab@example.com>";
         let author2 = "cd C D <cd@example.com>";
 
@@ -148,7 +94,7 @@ mod test {
     #[should_panic]
     fn test_mob_empty_authors() {
         let gm = get_git_mob();
-        gm.mob(vec![String::from("ab")]);
+        gm.mob(vec![String::from("ef")]);
     }
 
     #[test]
@@ -158,7 +104,7 @@ mod test {
 
         gm.file_actions
             .write(
-                Path::new(""),
+                &gm.get_coauthors_path(),
                 json!({
                     "coauthors": {
                     }
