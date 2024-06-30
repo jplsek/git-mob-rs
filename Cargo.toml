@@ -1,6 +1,6 @@
 [package]
 name = "git_mob_rs"
-version = "0.4.0"
+version = "0.5.0"
 authors = ["Jeremy Plsek <jeremyplsek@gmail.com>"]
 edition = "2018"
 description = "A CLI tool for social coding."
@@ -14,9 +14,9 @@ exclude = [
 
 [dependencies]
 dirs = "5.0"
-clap = { version = "4.5.4", features = ["derive"] }
-gix = "0.62.0"
-gix-config = "0.36.1"
+clap = { version = "4.5.8", features = ["derive"] }
+gix = "0.63.0"
+gix-config = "0.37.0"
 open = "5"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
