@@ -13,7 +13,7 @@ struct Cli {
 }
 
 trait Mob {
-    fn mob(&self, users: Vec<String>) -> String;
+    fn mob(&self, users: &[String]) -> String;
     fn list(&self) -> String;
 }
 
@@ -31,7 +31,7 @@ impl<T: FileActions, U: ExitWithError> Mob for GitMob<T, U> {
         format!("{}\n", initials.join("\n"))
     }
 
-    fn mob(&self, initials: Vec<String>) -> String {
+    fn mob(&self, initials: &[String]) -> String {
         // make sure to not accidentally "solo"
         if initials.is_empty() {
             return self.get_formatted_gitmessage();
@@ -50,7 +50,7 @@ fn main() {
     if opts.list {
         print!("{}", gm.list());
     } else {
-        println!("{}", gm.mob(opts.initials));
+        println!("{}", gm.mob(&opts.initials));
     }
 }
 
@@ -68,15 +68,12 @@ mod test {
 
         assert_eq!(
             format!("{}\n{}", gm.get_git_user(), authors),
-            gm.mob(vec![String::from("ab"), String::from("cd")])
+            gm.mob(&[String::from("ab"), String::from("cd")])
         );
         assert_eq!(format!("\n\n{}", authors), gm.get_gitmessage());
 
         // make sure empty vec doesn't reset gitmessage file
-        assert_eq!(
-            format!("{}\n{}", gm.get_git_user(), authors),
-            gm.mob(vec![])
-        );
+        assert_eq!(format!("{}\n{}", gm.get_git_user(), authors), gm.mob(&[]));
         assert_eq!(format!("\n\n{}", authors), gm.get_gitmessage());
     }
 
@@ -94,7 +91,7 @@ mod test {
     #[should_panic]
     fn test_mob_empty_authors() {
         let gm = get_git_mob();
-        gm.mob(vec![String::from("ef")]);
+        gm.mob(&[String::from("ef")]);
     }
 
     #[test]
@@ -105,7 +102,7 @@ mod test {
         gm.file_actions
             .write(
                 &gm.get_coauthors_path(),
-                json!({
+                &json!({
                     "coauthors": {
                     }
                 })
@@ -113,6 +110,6 @@ mod test {
             )
             .unwrap();
 
-        gm.mob(vec![String::from("ab")]);
+        gm.mob(&[String::from("ab")]);
     }
 }

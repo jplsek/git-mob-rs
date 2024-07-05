@@ -1,14 +1,14 @@
 use std::process::exit;
 
 pub trait ExitWithError {
-    fn message<S: AsRef<str>>(&self, message: S) -> !;
+    fn message(&self, message: &str) -> !;
 }
 
 pub struct ExitWithErrorImpl();
 
 impl ExitWithError for ExitWithErrorImpl {
-    fn message<S: AsRef<str>>(&self, message: S) -> ! {
-        println!("{}", message.as_ref());
+    fn message(&self, message: &str) -> ! {
+        println!("{}", message);
         exit(1);
     }
 }

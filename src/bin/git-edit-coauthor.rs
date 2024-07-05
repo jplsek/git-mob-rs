@@ -17,15 +17,15 @@ struct Cli {
 }
 
 trait Edit {
-    fn edit(&self, initials: String, name: Option<String>, email: Option<String>) -> String;
+    fn edit(&self, initials: &str, name: Option<String>, email: Option<String>) -> String;
 }
 
 impl<T: FileActions, U: ExitWithError> Edit for GitMob<T, U> {
-    fn edit(&self, initials: String, name: Option<String>, email: Option<String>) -> String {
+    fn edit(&self, initials: &str, name: Option<String>, email: Option<String>) -> String {
         let coauthors_path = self.get_coauthors_path();
 
         let mut coauthors = self.get_all_coauthors();
-        let coauthor = coauthors.get_mut(&initials);
+        let coauthor = coauthors.get_mut(initials);
         match coauthor {
             Some(coauthor) => {
                 if let Some(name) = name {
@@ -36,7 +36,7 @@ impl<T: FileActions, U: ExitWithError> Edit for GitMob<T, U> {
                 }
             }
             None => {
-                self.exit_with_error.message(format!(
+                self.exit_with_error.message(&format!(
                     "Author with initials \"{}\" not found in \"{}\"!",
                     initials,
                     coauthors_path.display()
@@ -55,7 +55,7 @@ fn main() {
 
     let gm = GitMob::default();
 
-    println!("{}", gm.edit(opts.initials, opts.name, opts.email));
+    println!("{}", gm.edit(&opts.initials, opts.name, opts.email));
 }
 
 #[cfg(test)]
@@ -83,7 +83,7 @@ mod test {
         });
 
         gm.file_actions
-            .write(&gm.get_coauthors_path(), coauthors.to_string())
+            .write(&gm.get_coauthors_path(), &coauthors.to_string())
             .unwrap();
 
         let mut expected_coauthors = LinkedHashMap::new();
@@ -105,7 +105,7 @@ mod test {
         assert_eq!(
             "ab has been updated",
             gm.edit(
-                String::from("ab"),
+                &String::from("ab"),
                 Some(String::from("C D")),
                 Some(String::from("cd@example.com")),
             )
@@ -127,7 +127,7 @@ mod test {
         });
 
         gm.file_actions
-            .write(&gm.get_coauthors_path(), coauthors.to_string())
+            .write(&gm.get_coauthors_path(), &coauthors.to_string())
             .unwrap();
 
         let mut expected_coauthors = LinkedHashMap::new();
@@ -141,7 +141,7 @@ mod test {
 
         assert_eq!(
             "ab has been updated",
-            gm.edit(String::from("ab"), Some(String::from("C D")), None)
+            gm.edit(&String::from("ab"), Some(String::from("C D")), None)
         );
         assert_eq!(expected_coauthors, gm.get_all_coauthors());
     }
@@ -160,7 +160,7 @@ mod test {
         });
 
         gm.file_actions
-            .write(&gm.get_coauthors_path(), coauthors.to_string())
+            .write(&gm.get_coauthors_path(), &coauthors.to_string())
             .unwrap();
 
         let mut expected_coauthors = LinkedHashMap::new();
@@ -175,7 +175,7 @@ mod test {
         assert_eq!(
             "ab has been updated",
             gm.edit(
-                String::from("ab"),
+                &String::from("ab"),
                 None,
                 Some(String::from("cd@example.com"))
             )
@@ -187,6 +187,6 @@ mod test {
     #[should_panic]
     fn test_edit_author_who_does_not_exist() {
         let gm = get_git_mob();
-        gm.edit(String::from("ef"), None, None);
+        gm.edit(&String::from("ef"), None, None);
     }
 }

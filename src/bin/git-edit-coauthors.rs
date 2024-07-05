@@ -26,7 +26,7 @@ impl<T: FileActions, U: ExitWithError> Edit for GitMob<T, U> {
                 }
             });
             self.file_actions
-                .write(&coauthors_path, to_string_pretty(&s).unwrap())
+                .write(&coauthors_path, &to_string_pretty(&s).unwrap())
                 .unwrap();
         }
 

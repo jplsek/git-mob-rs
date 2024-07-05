@@ -15,20 +15,20 @@ struct Cli {
 }
 
 trait Add {
-    fn add(&self, initials: String, name: String, email: String) -> String;
+    fn add(&self, initials: &str, name: &str, email: &str) -> String;
 }
 
 impl<T: FileActions, U: ExitWithError> Add for GitMob<T, U> {
-    fn add(&self, initials: String, name: String, email: String) -> String {
+    fn add(&self, initials: &str, name: &str, email: &str) -> String {
         let coauthors_path = self.get_coauthors_path();
         let coauthors_path = coauthors_path.display();
 
         let mut coauthors = self.get_all_coauthors();
         coauthors.insert(
-            initials,
+            initials.to_string(),
             Author {
-                name: name.clone(),
-                email,
+                name: name.to_string(),
+                email: email.to_string(),
             },
         );
 
@@ -43,7 +43,7 @@ fn main() {
 
     let gm = GitMob::default();
 
-    println!("{}", gm.add(opts.initials, opts.name, opts.email));
+    println!("{}", gm.add(&opts.initials, &opts.name, &opts.email));
 }
 
 #[cfg(test)]
@@ -73,11 +73,7 @@ mod test {
                 "A B has been added to the {} file",
                 coauthors_path.display()
             ),
-            gm.add(
-                String::from("ab"),
-                String::from("A B"),
-                String::from("ab@example.com"),
-            )
+            gm.add(&"ab", &"A B", &"ab@example.com")
         );
         assert_eq!(expected_coauthors, gm.get_all_coauthors());
     }

@@ -49,7 +49,7 @@ mod test {
         let authors =
             "\n\nCo-authored-by: A B <ab@example.com>\nCo-authored-by: C D <cd@example.com>\n";
 
-        gm.write_gitmessage(vec![String::from("ab"), String::from("cd")]);
+        gm.write_gitmessage(&[String::from("ab"), String::from("cd")]);
 
         assert_eq!(authors, gm.print());
     }
@@ -58,11 +58,11 @@ mod test {
     fn test_print_initials() {
         let gm = get_git_mob();
 
-        gm.write_gitmessage(vec![]);
+        gm.write_gitmessage(&[]);
 
         assert_eq!("\n", gm.print_initials());
 
-        gm.write_gitmessage(vec![String::from("ab"), String::from("cd")]);
+        gm.write_gitmessage(&[String::from("ab"), String::from("cd")]);
 
         assert_eq!("ab,cd\n", gm.print_initials());
     }

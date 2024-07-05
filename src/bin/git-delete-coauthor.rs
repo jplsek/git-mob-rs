@@ -11,11 +11,11 @@ struct Cli {
 }
 
 trait Delete {
-    fn delete(&self, initials: Vec<String>) -> String;
+    fn delete(&self, initials: &[String]) -> String;
 }
 
 impl<T: FileActions, U: ExitWithError> Delete for GitMob<T, U> {
-    fn delete(&self, initials: Vec<String>) -> String {
+    fn delete(&self, initials: &[String]) -> String {
         let coauthors_path = self.get_coauthors_path();
         let coauthors_path = coauthors_path.display();
 
@@ -37,7 +37,7 @@ fn main() {
 
     let gm = GitMob::default();
 
-    print!("{}", gm.delete(opts.initials));
+    print!("{}", gm.delete(&opts.initials));
 }
 
 #[cfg(test)]
@@ -70,7 +70,7 @@ mod test {
         });
 
         gm.file_actions
-            .write(&coauthors_path, coauthors.to_string())
+            .write(&coauthors_path, &coauthors.to_string())
             .unwrap();
 
         let mut expected_coauthors = LinkedHashMap::new();
@@ -88,7 +88,7 @@ mod test {
                 coauthors_path.display(),
                 coauthors_path.display()
             ),
-            gm.delete(vec![String::from("cd"), String::from("ef")])
+            gm.delete(&[String::from("cd"), String::from("ef")])
         );
         assert_eq!(expected_coauthors, gm.get_all_coauthors());
     }
