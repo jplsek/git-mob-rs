@@ -8,14 +8,12 @@ license = "MIT"
 homepage = "https://github.com/jplsek/git-mob-rs"
 repository = "https://github.com/jplsek/git-mob-rs"
 readme = "README.md"
-exclude = [
-    "benchmark.sh"
-]
+exclude = ["benchmark.sh"]
 
 [dependencies]
 dirs = "5.0"
 clap = { version = "4.5.8", features = ["derive"] }
-gix = "0.63.0"
+gix = { version = "0.63.0", default-features = false }
 gix-config = "0.37.0"
 open = "5"
 serde = { version = "1.0", features = ["derive"] }

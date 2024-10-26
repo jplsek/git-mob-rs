@@ -69,17 +69,13 @@ impl<T: FileActions, U: ExitWithError> GitMob<T, U> {
                 .iter()
                 .map(|initial| {
                     if coauthors.contains_key(initial) {
-                        let author = &coauthors[initial];
-                        let name = &author.name;
-                        let email = &author.email;
+                        let Author { name, email } = &coauthors[initial];
                         format!("Co-authored-by: {name} <{email}>")
                     } else {
                         let coauthors_path = self.get_coauthors_path();
-                        let coauthors_path = coauthors_path.as_path();
+                        let coauthors_path = coauthors_path.as_path().display();
                         self.exit_with_error.message(&format!(
-                            "Author with initials \"{}\" not found in \"{}\"!",
-                            initial,
-                            coauthors_path.display()
+                            "Author with initials \"{initial}\" not found in \"{coauthors_path}\"!"
                         ));
                     }
                 })
@@ -388,7 +384,7 @@ mod test {
         let config_file_path = dir.path().join("config");
         {
             let mut config_file = File::create(&config_file_path).unwrap();
-            config_file.write(default_config.as_bytes()).unwrap();
+            config_file.write_all(default_config.as_bytes()).unwrap();
         }
 
         let gm = get_git_mob();
@@ -423,7 +419,7 @@ mod test {
         let config_file_path = dir.path().join("config");
         {
             let mut config_file = File::create(&config_file_path).unwrap();
-            config_file.write(default_config.as_bytes()).unwrap();
+            config_file.write_all(default_config.as_bytes()).unwrap();
         }
 
         let gm = get_git_mob();
