@@ -95,7 +95,60 @@ If someone else feels like making some of these missing features, feel free to s
 
 ## Benchmarks
 
-Summary: **Over 15x faster**
+Summary: **Over 100x faster** (past benchmarks were about **15x faster**)
+
+These were ran on an Apple M2.
+
+```
++ git-solo --version
+3.2.0
++ target/release/git-solo --version
+git_mob_rs 0.5.1
+```
+
+### `git-solo`
+
+```
++ hyperfine --warmup 3 -- git-solo target/release/git-solo
+Benchmark 1: git-solo
+  Time (mean ± σ):     173.7 ms ±   1.3 ms    [User: 210.8 ms, System: 43.4 ms]
+  Range (min … max):   171.9 ms … 177.7 ms    17 runs
+
+Benchmark 2: target/release/git-solo
+  Time (mean ± σ):       1.5 ms ±   0.1 ms    [User: 0.7 ms, System: 0.6 ms]
+  Range (min … max):     1.2 ms …   1.8 ms    862 runs
+
+Summary
+  target/release/git-solo ran
+  119.80 ± 6.16 times faster than git-solo
+```
+
+### `git-mob`
+
+```
++ hyperfine --warmup 3 -- 'git-mob ts' 'target/release/git-mob ts'
+Benchmark 1: git-mob ts
+  Time (mean ± σ):     232.3 ms ±   1.8 ms    [User: 249.3 ms, System: 68.4 ms]
+  Range (min … max):   230.2 ms … 236.1 ms    12 runs
+
+Benchmark 2: target/release/git-mob ts
+  Time (mean ± σ):       2.0 ms ±   0.2 ms    [User: 0.9 ms, System: 0.9 ms]
+  Range (min … max):     1.8 ms …   4.3 ms    515 runs
+
+Summary
+  target/release/git-mob ts ran
+  115.48 ± 11.82 times faster than git-mob ts
+```
+
+### Benchmarks (mid 2021)
+
+<details><summary>Summary: **Over 15x faster**</summary>
+
+I think these were ran on my previous laptop, an Intel Core i5 7700U, or my desktop, an Intel Core i7 9700K.
+
+```
+git_mob_rs 0.1.2
+```
 
 ### `git-solo`
 
@@ -130,3 +183,4 @@ Summary
 'target/release/git-mob ts' ran
 20.17 ± 5.59 times faster than 'git-mob ts'
 ```
+</details>

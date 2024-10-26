@@ -1,6 +1,6 @@
 [package]
 name = "git_mob_rs"
-version = "0.5.0"
+version = "0.5.1"
 authors = ["Jeremy Plsek <jeremyplsek@gmail.com>"]
 edition = "2018"
 description = "A CLI tool for social coding."
