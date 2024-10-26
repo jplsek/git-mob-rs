@@ -122,15 +122,13 @@ impl<T: FileActions, U: ExitWithError> GitMob<T, U> {
         let template = ".git/.gitmessage";
 
         // don't write to file if we don't have to
-        if let Ok(value) = config.raw_value("commit", None, "template") {
+        if let Ok(value) = config.raw_value("commit.template") {
             if value.as_bstr() == template {
                 return;
             }
         }
 
-        config
-            .set_raw_value("commit", None, "template", template)
-            .unwrap();
+        config.set_raw_value(&"commit.template", template).unwrap();
 
         let mut config_file = File::create(config_path).unwrap();
         config.write_to(&mut config_file).unwrap();
@@ -205,10 +203,9 @@ impl<T: FileActions, U: ExitWithError> GitMob<T, U> {
             return String::new();
         }
 
-        match self.file_actions.read(&self.get_gitinitials_path()) {
-            Ok(s) => s,
-            Err(_) => String::new(),
-        }
+        self.file_actions
+            .read(&self.get_gitinitials_path())
+            .unwrap_or_default()
     }
 
     pub fn get_formatted_gitmessage(&self) -> String {
